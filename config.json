@@ -1,0 +1,15 @@
+{
+    "host": "127.0.0.1",
+    "port": 8443,
+    "interface": "",
+    "key": "/path/to/tls/private.key",
+    "cert": "/path/to/tls/public.cert",
+    "verbose": true,
+    "psql": {
+        "dbname": "tls_clienthellos13",
+        "user": "postgres",
+        "password": "password",
+        "host": "localhost",
+        "port": 5432
+    }
+}

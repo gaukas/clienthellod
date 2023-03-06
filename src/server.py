@@ -5,12 +5,13 @@ import socket, ssl, struct, sys
 import threading, time
 
 from parsepcap import Fingerprint
-
+from prod import db
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 
 chello_lock = threading.RLock()
 chello_map = {}  #(addr,port) => (time, client_hello)
+psql = db.PSQL()
 
 class HTTPRequest(BaseHTTPRequestHandler):
     def __init__(self, request_text):
@@ -48,10 +49,12 @@ def parse_ip_pkt(ip, port, v: bool = False):
 
     if tls[0] != 0x16:
         # Not a handshake
-        print(f"Pkt starts with {tls[0]}, NO HS")
+        if v:
+            print(f"Pkt starts with {tls[0]}, NO HS")
         return
-
-    print(f"Handshake found for ip {ip.src}, port {tcp.sport}")
+    
+    if v:
+        print(f"Handshake found for ip {ip.src}, port {tcp.sport}")
 
     # check that we haven't already gotten data for this client
     client = (ip.src, tcp.sport)
@@ -74,13 +77,61 @@ def capture_pkts(iface="eth0", port=8443, v: bool=False):
 
         # Periodically cleanup
         if next_run < time.time():
-            cleanup_map()
+            cleanup_map(v)
             next_run = time.time() + 120
 
-# def add_useragent() # removed for non-tlsfingerprint.io setups
+def add_useragent(nid, norm_nid, agent):
+    global psql
+    conn = None
+    try:
+        conn = psql.conn()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM fingerprints WHERE id=%s", [nid])
+        rows = cur.fetchall()
+
+        # # The below implementation is removed since we implement normalization
+        # if len(rows) == 0:
+        #     # Unique fingerprint, need to insert
+        #     db.cur.execute('''INSERT INTO fingerprints (id, record_tls_version, ch_tls_version,
+        #                     cipher_suites, compression_methods, extensions, named_groups,
+        #                     ec_point_fmt, sig_algs, alpn, key_share, psk_key_exchange_modes,
+        #                     supported_versions, cert_compression_algs, record_size_limit)
+        #                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+        #     (fid, out['tls_version'], out['ch_version'], bytea(out['cipher_suites']),
+        #     bytea(out['compression_methods']), bytea(out['extensions']), bytea(out['curves']),
+        #     bytea(out['pt_fmts']), bytea(out['sig_algs']), bytea(out['alpn']),\
+        #     bytea(out['key_share']), bytea(out['psk_key_exchange_modes']), \
+        #     bytea(out['supported_versions']), bytea(out['cert_compression_algs']),\
+        #     bytea(out['record_size_limit'])))
+        
+        # Instead we insert to useragents only when the fingerprint is seen before to reduce overhead
+        if len(rows) > 0:
+            cur.execute("INSERT INTO useragents (unixtime, id, useragent) VALUES (%s, %s, %s)",
+                (int(time.time()), nid, agent))
+        conn.commit()
+    except Exception as e:
+        print(f'add_useragent({str(nid)}, {str(norm_nid)}, {agent}) for original fp: {e}')
+        if conn:
+            conn.rollback()
+
+    # No matter if the original fingerprint is seen before, we still try to insert the normalized one
+    try:
+        conn = psql.conn()
+        cur = conn.cursor()
+        # And check if the normalized fingerprint is seen before
+        # db.cur.execute("SELECT * FROM fingerprints_norm_ext WHERE id=%s", [norm_fid])
+        # rows = db.cur.fetchall()
+        # if len(rows) > 0:
+        cur.execute("INSERT INTO useragents (unixtime, id, useragent) VALUES (%s, %s, %s)",
+            (int(time.time()), norm_nid, agent))
+        conn.commit()
+    except Exception as e:
+        print(f'add_useragent({str(nid)}, {str(norm_nid)}, {agent}) for original fp: {e}')
+        if conn:
+            conn.rollback()
 
 def handle(conn):
-    global chello_lock, chello_map
+    global chello_lock, chello_map, psql
     buf = b''
     while True:
         req = conn.recv()
@@ -151,9 +202,8 @@ def handle(conn):
     conn.write(bytes(f'HTTP/1.1 200 OK\r\nContent-type: application/json\r\nContent-Length: {len(resp)}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{resp}', 'utf-8'))
 
     conn.close()
-    # # No longer needed
-    # with db_lock:
-    #     add_useragent(out)
+    
+    add_useragent(out)
 
 def handle_accept(ssock, addr, key, cert):
     conn = None
@@ -168,38 +218,55 @@ def handle_accept(ssock, addr, key, cert):
             conn.close()
 
 def main():
+    global psql
     parser = argparse.ArgumentParser(
         prog = 'ClientHello Fingerprinter Server',
         description = 'This is a server that fingerprints TLS ClientHello messages and generates a unique ID for each unique ClientHello to be used at TLSFingerprint.io.',
         epilog = 'Copyright (c) 2023, TLSFingerprint.io')
 
-    parser.add_argument('-t', '--host', default='') # host to listen on
-    parser.add_argument('-p', '--port', default=8443) # port to listen on
-    parser.add_argument('-i', '--interface', default='') # interface to pcap on
-    parser.add_argument('-k', '--keyfile', default='') # keyfile for TLS
-    parser.add_argument('-c', '--certfile', default='') # certfile for TLS
-    parser.add_argument('-v', '--verbose', action='store_true')  # on/off flag
+    # parser.add_argument('-t', '--host', default='') # host to listen on
+    # parser.add_argument('-p', '--port', default=8443) # port to listen on
+    # parser.add_argument('-i', '--interface', default='') # interface to pcap on
+    # parser.add_argument('-k', '--keyfile', default='') # keyfile for TLS
+    # parser.add_argument('-c', '--certfile', default='') # certfile for TLS
+    # parser.add_argument('-v', '--verbose', action='store_true')  # on/off flag
+    parser.add_argument('-c', '--confiig', default='config.json') # config file
     args = parser.parse_args()
 
-    if args.interface == '':
-        print('Error: No interface specified')
-        sys.exit(1)
+    with open(args.config, 'r') as f:
+        config = json.load(f)
 
-    sock = socket.socket()
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind((args.host, args.port))
-    sock.listen(5)
-    iface = args.interface
+        host = config['host']
+        port = config['port']
+        interface = config['interface']
+        keyfile = config['key']
+        certfile = config['cert']
+        verbose = config['verbose']
 
-    t = threading.Thread(target=capture_pkts, args=(iface, args.port, args.verbose))
-    t.setDaemon(True)
-    t.start()
+        if interface == '':
+            print('Error: No interface specified')
+            sys.exit(1)
 
-    while True:
-        ssock, addr = sock.accept()
-        t = threading.Thread(target=handle_accept, args=(ssock,addr,args.keyfile,args.certfile))
+        # optional psql config
+        if 'psql' in config:
+            pgconf: dict = config['psql']
+            psql.connect(pgconf.get('database', 'postgres'), pgconf.get('user', 'postgres'), pgconf.get('host', 'localhost'), pgconf.get('password', None), pgconf.get('port', None))
+
+        sock = socket.socket()
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind((host, port))
+        sock.listen(5)
+        iface = interface
+
+        t = threading.Thread(target=capture_pkts, args=(iface, port, verbose))
         t.setDaemon(True)
         t.start()
+
+        while True:
+            ssock, addr = sock.accept()
+            t = threading.Thread(target=handle_accept, args=(ssock,addr,keyfile,certfile))
+            t.setDaemon(True)
+            t.start()
 
 if __name__ == '__main__':
     main()
