@@ -7,8 +7,8 @@ import (
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/gaukas/clienthellod"
-	"github.com/gaukas/clienthellod/app"
 	"github.com/gaukas/clienthellod/internal/utils"
+	"github.com/gaukas/clienthellod/modcaddy/app"
 	"go.uber.org/zap"
 )
 
@@ -67,14 +67,8 @@ func (lw *ListenerWrapper) WrapListener(l net.Listener) net.Listener {
 		} else {
 			lw.logger.Debug("TCP not enabled. Skipping...")
 		}
-	}
-
-	if l.Addr().Network() == "udp" || l.Addr().Network() == "udp4" || l.Addr().Network() == "udp6" {
-		if lw.UDP {
-			return wrapQuicListener(l)
-		} else {
-			lw.logger.Debug("UDP not enabled. Skipping...")
-		}
+	} else {
+		lw.logger.Debug("Not TCP. Skipping...")
 	}
 
 	return l
@@ -110,25 +104,6 @@ func (l *tlsListener) Accept() (net.Conn, error) {
 
 	// No matter what happens, rewind the connection
 	return utils.RewindConn(conn, ch.Raw())
-}
-
-type quicListener struct {
-	net.Listener
-}
-
-func wrapQuicListener(in net.Listener) net.Listener {
-	return &quicListener{
-		Listener: in,
-	}
-}
-
-func (l *quicListener) Accept() (net.Conn, error) {
-	conn, err := l.Listener.Accept()
-	if err != nil {
-		return conn, err
-	}
-	// TODO: process conn
-	return conn, err
 }
 
 func (lw *ListenerWrapper) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {

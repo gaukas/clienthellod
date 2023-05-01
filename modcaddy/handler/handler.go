@@ -9,7 +9,7 @@ import (
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/gaukas/clienthellod/app"
+	"github.com/gaukas/clienthellod/modcaddy/app"
 	"go.uber.org/zap"
 )
 
