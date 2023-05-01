@@ -69,7 +69,12 @@ func (h *Handler) ServeHTTP(wr http.ResponseWriter, req *http.Request, next cadd
 	h.logger.Debug("ClientHello NormID: " + ch.FingerprintID(true))
 
 	// dump JSON
-	b, err := json.MarshalIndent(ch, "", "  ")
+	var b []byte
+	if req.URL.Query().Get("beautify") == "true" {
+		b, err = json.MarshalIndent(ch, "", "  ")
+	} else {
+		b, err = json.Marshal(ch)
+	}
 	if err != nil {
 		h.logger.Error("failed to marshal client hello", zap.Error(err))
 		return next.ServeHTTP(wr, req)
