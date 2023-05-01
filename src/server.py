@@ -200,10 +200,8 @@ def handle(conn):
     resp = json.dumps(out)
 
     conn.write(bytes(f'HTTP/1.1 200 OK\r\nContent-type: application/json\r\nContent-Length: {len(resp)}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{resp}', 'utf-8'))
-
     conn.close()
-    
-    add_useragent(out)
+    add_useragent(out['nid'], out['norm_nid'], out['agent'])
 
 def handle_accept(ssock, addr, key, cert):
     conn = None
