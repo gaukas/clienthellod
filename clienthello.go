@@ -38,6 +38,8 @@ type ClientHello struct {
 	KeyShare            []uint16       `json:"key_share"`              // key_share(51)
 	ApplicationSettings []string       `json:"application_settings"`   // application_settings(17513) a.k.a ALPS
 
+	UserAgent string `json:"user_agent,omitempty"` // User-Agent header, set by the caller
+
 	NID     int64  `json:"nid,omitempty"`      // NID of the fingerprint
 	NormNID int64  `json:"norm_nid,omitempty"` // Normalized NID of the fingerprint
 	ID      string `json:"id,omitempty"`       // ID of the fingerprint (hex string)

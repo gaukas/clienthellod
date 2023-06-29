@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/caddyserver/caddy/v2 v2.6.4
+	github.com/google/gopacket v1.1.19
 	github.com/refraction-networking/utls v1.3.2
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.5.0

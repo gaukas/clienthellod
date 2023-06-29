@@ -3,24 +3,36 @@
     http_port    7080
 	https_port   7443
     order clienthellod before file_server
-    clienthellod {
+    clienthellod { # app (reservoir)
         validfor 20s 30s
     }
     servers {
         listener_wrappers {
-            clienthellod {
-                tcp
-                udp
+            clienthellod { # listener
+                tcp # listens for TCP and saves TLS ClientHello 
+                udp # listens for UDP and saves QUIC ClientHello
             }
             tls
         }
     }
 }
 
-127.0.0.1, localhost {
+172.21.190.119, localhost, 127.0.0.1 {
     tls internal
-    clienthellod
+    clienthellod { # handler
+        tls # listener_wrappers.clienthellod.tcp must be set
+    }
     file_server {
         root /var/www/html
     }
 }
+
+# 127.0.0.2 {
+#     tls internal
+#     clienthellod { # handler
+#         quic # listener_wrappers.clienthellod.udp must be set
+#     }
+#     file_server {
+#         root /var/www/html
+#     }
+# }

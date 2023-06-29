@@ -32,34 +32,16 @@ type Reservoir struct {
 		ch     *clienthellod.ClientHello
 		expiry time.Time
 	}
-	mutex  *sync.Mutex
+	mutex *sync.Mutex
+
+	qchMap map[string]*struct {
+		qch    *clienthellod.QClientHello
+		expiry time.Time
+	}
+	qmutex *sync.Mutex
+
 	ticker *time.Ticker
 	logger *zap.Logger
-}
-
-// DepositClientHello stores the ClientHello extracted from the incoming TLS
-// connection into the reservoir, with the client address as the key.
-func (r *Reservoir) DepositClientHello(addr string, ch *clienthellod.ClientHello) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	r.chMap[addr] = &struct {
-		ch     *clienthellod.ClientHello
-		expiry time.Time
-	}{ch, time.Now().Add(time.Duration(r.ValidFor))}
-}
-
-// WithdrawClientHello retrieves the ClientHello from the reservoir and
-// deletes it from the reservoir, using the client address as the key.
-func (r *Reservoir) WithdrawClientHello(addr string) (ch *clienthellod.ClientHello) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	if v, ok := r.chMap[addr]; ok {
-		if time.Now().Before(v.expiry) {
-			ch = v.ch
-		}
-		delete(r.chMap, addr)
-	}
-	return
 }
 
 // CaddyModule implements CaddyModule() of caddy.Module.
@@ -76,9 +58,64 @@ func (Reservoir) CaddyModule() caddy.ModuleInfo {
 					expiry time.Time
 				}),
 				mutex: new(sync.Mutex),
+				qchMap: make(map[string]*struct {
+					qch    *clienthellod.QClientHello
+					expiry time.Time
+				}),
+				qmutex: new(sync.Mutex),
 			}
 		},
 	}
+}
+
+// DepositClientHello stores the TLS ClientHello extracted from the incoming TLS
+// connection into the reservoir, with the client address as the key.
+func (r *Reservoir) DepositClientHello(addr string, ch *clienthellod.ClientHello) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.chMap[addr] = &struct {
+		ch     *clienthellod.ClientHello
+		expiry time.Time
+	}{ch, time.Now().Add(time.Duration(r.ValidFor))}
+}
+
+// DepositQClientHello stores the QUIC ClientHello extracted from the incoming QUIC
+// connection into the reservoir, with the client address as the key.
+func (r *Reservoir) DepositQClientHello(addr string, qch *clienthellod.QClientHello) {
+	r.qmutex.Lock()
+	defer r.qmutex.Unlock()
+	r.qchMap[addr] = &struct {
+		qch    *clienthellod.QClientHello
+		expiry time.Time
+	}{qch, time.Now().Add(time.Duration(r.ValidFor))}
+}
+
+// WithdrawClientHello retrieves the ClientHello from the reservoir and
+// deletes it from the reservoir, using the client address as the key.
+func (r *Reservoir) WithdrawClientHello(addr string) (ch *clienthellod.ClientHello) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	if v, ok := r.chMap[addr]; ok {
+		if time.Now().Before(v.expiry) {
+			ch = v.ch
+		}
+		delete(r.chMap, addr)
+	}
+	return
+}
+
+// WithdrawQClientHello retrieves the QUIC ClientHello from the reservoir and
+// deletes it from the reservoir, using the client address as the key.
+func (r *Reservoir) WithdrawQClientHello(addr string) (qch *clienthellod.QClientHello) {
+	r.qmutex.Lock()
+	defer r.qmutex.Unlock()
+	if v, ok := r.qchMap[addr]; ok {
+		if time.Now().Before(v.expiry) {
+			qch = v.qch
+		}
+		delete(r.qchMap, addr)
+	}
+	return
 }
 
 // Start implements Start() of caddy.App.
@@ -101,6 +138,14 @@ func (r *Reservoir) Start() error {
 				}
 			}
 			r.mutex.Unlock()
+
+			r.qmutex.Lock()
+			for k, v := range r.qchMap {
+				if v.expiry.Before(time.Now()) {
+					delete(r.qchMap, k)
+				}
+			}
+			r.qmutex.Unlock()
 		}
 	}()
 	return nil
@@ -118,7 +163,7 @@ func (r *Reservoir) Stop() error {
 // Provision implements Provision() of caddy.Provisioner.
 func (r *Reservoir) Provision(ctx caddy.Context) error {
 	r.logger = ctx.Logger(r)
-	r.logger.Info("reservoir is provisioned")
+	r.logger.Info("clienthellod reservoir is provisioned")
 	return nil
 }
 
