@@ -2,6 +2,7 @@ package listener
 
 import (
 	"errors"
+	"io"
 	"net"
 
 	"github.com/caddyserver/caddy/v2"
@@ -87,8 +88,12 @@ func (lw *ListenerWrapper) udpLoop() {
 		n, ipaddr, err := lw.udpListener.ReadFromIP(buf[:])
 		if err != nil {
 			lw.logger.Error("UDP read error", zap.Error(err))
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, net.ErrClosed) {
+				return // return when listener is closed
+			}
 			continue
 		}
+		lw.logger.Debug("Received UDP packet from " + ipaddr.String())
 
 		// Parse UDP Packet
 		udpPkt, err := utils.ParseUDPPacket(buf[:n])
@@ -97,6 +102,7 @@ func (lw *ListenerWrapper) udpLoop() {
 			continue
 		}
 		udpAddr := &net.UDPAddr{IP: ipaddr.IP, Port: int(udpPkt.SrcPort)}
+		lw.logger.Debug("Parsed UDP packet from " + udpAddr.String())
 
 		qch, err := clienthellod.ParseQClientHello(udpPkt.Payload)
 		if err != nil {
