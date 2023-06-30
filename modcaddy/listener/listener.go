@@ -32,9 +32,10 @@ type ListenerWrapper struct {
 	TCP bool `json:"tcp,omitempty"`
 	UDP bool `json:"udp,omitempty"`
 
-	logger      *zap.Logger
-	reservoir   *app.Reservoir
-	udpListener *net.IPConn
+	logger       *zap.Logger
+	reservoir    *app.Reservoir
+	udpListener  *net.IPConn
+	udp6Listener *net.IPConn
 }
 
 // CaddyModule returns the Caddy module information.
@@ -48,6 +49,9 @@ func (ListenerWrapper) CaddyModule() caddy.ModuleInfo {
 func (lw *ListenerWrapper) Cleanup() error {
 	if lw.UDP && lw.udpListener != nil {
 		return lw.udpListener.Close()
+	}
+	if lw.UDP && lw.udp6Listener != nil {
+		return lw.udp6Listener.Close()
 	}
 	return nil
 }
@@ -70,11 +74,18 @@ func (lw *ListenerWrapper) Provision(ctx caddy.Context) error {
 
 	// UDP listener if enabled and not already provisioned
 	if lw.UDP && lw.udpListener == nil {
-		lw.udpListener, err = net.ListenIP("ip:udp", &net.IPAddr{IP: net.IPv4zero})
+		lw.udpListener, err = net.ListenIP("ip4:udp", &net.IPAddr{})
 		if err != nil {
 			return err
 		}
 		go lw.udpLoop()
+
+		lw.udp6Listener, err = net.ListenIP("ip6:udp", &net.IPAddr{})
+		if err != nil {
+			return err
+		}
+		go lw.udp6Loop()
+
 		go lw.logger.Info("clienthellod listener UDP listener loaded.")
 	}
 
@@ -85,7 +96,7 @@ func (lw *ListenerWrapper) Provision(ctx caddy.Context) error {
 func (lw *ListenerWrapper) udpLoop() {
 	for {
 		var buf [2048]byte
-		n, ipaddr, err := lw.udpListener.ReadFromIP(buf[:])
+		n, ipAddr, err := lw.udpListener.ReadFromIP(buf[:])
 		if err != nil {
 			lw.logger.Error("UDP read error", zap.Error(err))
 			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, net.ErrClosed) {
@@ -93,7 +104,7 @@ func (lw *ListenerWrapper) udpLoop() {
 			}
 			continue
 		}
-		lw.logger.Debug("Received UDP packet from " + ipaddr.String())
+		lw.logger.Debug("Received UDP packet from " + ipAddr.String())
 
 		// Parse UDP Packet
 		udpPkt, err := utils.ParseUDPPacket(buf[:n])
@@ -101,15 +112,46 @@ func (lw *ListenerWrapper) udpLoop() {
 			lw.logger.Error("Failed to parse UDP packet", zap.Error(err))
 			continue
 		}
-		udpAddr := &net.UDPAddr{IP: ipaddr.IP, Port: int(udpPkt.SrcPort)}
-		lw.logger.Debug("Parsed UDP packet from " + udpAddr.String())
+		// udpAddr := &net.UDPAddr{IP: ipaddr.IP, Port: int(udpPkt.SrcPort)}
+		// lw.logger.Debug("Parsed UDP packet from " + udpAddr.String())
 
 		qch, err := clienthellod.ParseQClientHello(udpPkt.Payload)
 		if err != nil {
 			continue
 		}
-		lw.logger.Debug("Depositing QClientHello from " + udpAddr.String())
-		lw.reservoir.DepositQClientHello(udpAddr.String(), qch)
+		lw.logger.Debug("Depositing QClientHello from " + ipAddr.String())
+		lw.reservoir.DepositQClientHello(ipAddr.String(), qch)
+	}
+}
+
+func (lw *ListenerWrapper) udp6Loop() {
+	for {
+		var buf [2048]byte
+		n, ipAddr, err := lw.udp6Listener.ReadFromIP(buf[:])
+		if err != nil {
+			lw.logger.Error("UDP read error", zap.Error(err))
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, net.ErrClosed) {
+				return // return when listener is closed
+			}
+			continue
+		}
+		lw.logger.Debug("Received UDP packet from " + ipAddr.String())
+
+		// Parse UDP Packet
+		udpPkt, err := utils.ParseUDPPacket(buf[:n])
+		if err != nil {
+			lw.logger.Error("Failed to parse UDP packet", zap.Error(err))
+			continue
+		}
+		// udpAddr := &net.UDPAddr{IP: ipaddr.IP, Port: int(udpPkt.SrcPort)}
+		// lw.logger.Debug("Parsed UDP packet from " + udpAddr.String())
+
+		qch, err := clienthellod.ParseQClientHello(udpPkt.Payload)
+		if err != nil {
+			continue
+		}
+		lw.logger.Debug("Depositing QClientHello from " + ipAddr.String())
+		lw.reservoir.DepositQClientHello(ipAddr.String(), qch)
 	}
 }
 

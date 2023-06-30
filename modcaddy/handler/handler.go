@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -74,8 +75,8 @@ func (h *Handler) Provision(ctx caddy.Context) error {
 func (h *Handler) ServeHTTP(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error {
 	if h.TLS && req.ProtoMajor <= 2 { // HTTP/1.0, HTTP/1.1, H2
 		return h.serveHTTP(wr, req, next) // TLS ClientHello capture enabled, serve ClientHello
-	} else if h.QUIC && req.ProtoMajor == 3 { // QUIC
-		h.logger.Debug(fmt.Sprintf("Handling QUIC connection (%s) from %s...", req.Proto, req.RemoteAddr))
+	} else if h.QUIC { // else if h.QUIC && req.ProtoMajor == 3 { // QUIC
+		h.logger.Debug(fmt.Sprintf("Checking QUIC ClientHello for %s on %s(H%d)... ", req.RemoteAddr, req.Proto, req.ProtoMajor))
 		return h.serveQUIC(wr, req, next)
 	}
 	return next.ServeHTTP(wr, req)
@@ -130,14 +131,15 @@ func (h *Handler) serveHTTP(wr http.ResponseWriter, req *http.Request, next cadd
 // serveQUIC handles QUIC requests by looking up the ClientHello from the
 // reservoir and writing it to the response.
 func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error {
+	ipAddr := strings.Split(req.RemoteAddr, ":")[0]
 	// get the client hello from the reservoir
-	h.logger.Debug(fmt.Sprintf("Withdrawing QUIC client hello from %s", req.RemoteAddr))
-	qch := h.reservoir.WithdrawQClientHello(req.RemoteAddr)
+	h.logger.Debug(fmt.Sprintf("Withdrawing QUIC client hello from %s", ipAddr))
+	qch := h.reservoir.WithdrawQClientHello(ipAddr)
 	if qch == nil {
-		h.logger.Debug(fmt.Sprintf("Can't withdraw QUIC client hello from %s, is it not a QUIC connection?", req.RemoteAddr))
+		h.logger.Debug(fmt.Sprintf("Can't withdraw QUIC client hello from %s, is it not a QUIC connection?", ipAddr))
 		return next.ServeHTTP(wr, req)
 	}
-	h.logger.Debug(fmt.Sprintf("Withdrew QUIC client hello from %s", req.RemoteAddr))
+	h.logger.Debug(fmt.Sprintf("Withdrew QUIC client hello from %s", ipAddr))
 
 	err := qch.ParseClientHello()
 	if err != nil {
