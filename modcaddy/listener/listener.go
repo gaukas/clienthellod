@@ -104,7 +104,7 @@ func (lw *ListenerWrapper) udpLoop() {
 			}
 			continue
 		}
-		lw.logger.Debug("Received UDP packet from " + ipAddr.String())
+		// lw.logger.Debug("Received UDP packet from " + ipAddr.String())
 
 		// Parse UDP Packet
 		udpPkt, err := utils.ParseUDPPacket(buf[:n])
@@ -112,15 +112,15 @@ func (lw *ListenerWrapper) udpLoop() {
 			lw.logger.Error("Failed to parse UDP packet", zap.Error(err))
 			continue
 		}
-		// udpAddr := &net.UDPAddr{IP: ipaddr.IP, Port: int(udpPkt.SrcPort)}
+		udpAddr := &net.UDPAddr{IP: ipAddr.IP, Port: int(udpPkt.SrcPort)}
 		// lw.logger.Debug("Parsed UDP packet from " + udpAddr.String())
 
 		qch, err := clienthellod.ParseQClientHello(udpPkt.Payload)
 		if err != nil {
 			continue
 		}
-		lw.logger.Debug("Depositing QClientHello from " + ipAddr.String())
-		lw.reservoir.DepositQClientHello(ipAddr.String(), qch)
+		// lw.logger.Debug("Depositing QClientHello from " + ipAddr.String())
+		lw.reservoir.DepositQClientHello(udpAddr.String(), qch)
 	}
 }
 
@@ -135,7 +135,7 @@ func (lw *ListenerWrapper) udp6Loop() {
 			}
 			continue
 		}
-		lw.logger.Debug("Received UDP packet from " + ipAddr.String())
+		// lw.logger.Debug("Received UDP packet from " + ipAddr.String())
 
 		// Parse UDP Packet
 		udpPkt, err := utils.ParseUDPPacket(buf[:n])
@@ -143,15 +143,15 @@ func (lw *ListenerWrapper) udp6Loop() {
 			lw.logger.Error("Failed to parse UDP packet", zap.Error(err))
 			continue
 		}
-		// udpAddr := &net.UDPAddr{IP: ipaddr.IP, Port: int(udpPkt.SrcPort)}
+		udpAddr := &net.UDPAddr{IP: ipAddr.IP, Port: int(udpPkt.SrcPort)}
 		// lw.logger.Debug("Parsed UDP packet from " + udpAddr.String())
 
 		qch, err := clienthellod.ParseQClientHello(udpPkt.Payload)
 		if err != nil {
 			continue
 		}
-		lw.logger.Debug("Depositing QClientHello from " + ipAddr.String())
-		lw.reservoir.DepositQClientHello(ipAddr.String(), qch)
+		// lw.logger.Debug("Depositing QClientHello from " + ipAddr.String())
+		lw.reservoir.DepositQClientHello(udpAddr.String(), qch)
 	}
 }
 
