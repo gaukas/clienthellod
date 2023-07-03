@@ -23,6 +23,10 @@ func ParseQUICClientHello(p []byte) (*QUICClientHello, error) {
 		return nil, err
 	}
 
+	if err = ch.ParseClientHello(); err != nil {
+		return nil, err
+	}
+
 	return &QUICClientHello{ClientHello: *ch}, nil
 }
 

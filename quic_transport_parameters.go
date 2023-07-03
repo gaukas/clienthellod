@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/gaukas/clienthellod/internal/utils"
 	"github.com/gaukas/godicttls"
 )
 
@@ -15,30 +16,30 @@ const (
 )
 
 type QUICTransportParameters struct {
-	MaxIdleTimeoutLength                 uint32   `json:"max_idle_timeout_len,omitempty"`
-	MaxIdleTimeout                       []byte   `json:"max_idle_timeout,omitempty"`
-	MaxUDPPayloadSizeLength              uint32   `json:"max_udp_payload_size_len,omitempty"`
-	MaxUDPPayloadSize                    []byte   `json:"max_udp_payload_size,omitempty"`
-	InitialMaxDataLength                 uint32   `json:"initial_max_data_len,omitempty"`
-	InitialMaxData                       []byte   `json:"initial_max_data,omitempty"`
-	InitialMaxStreamDataBidiLocalLength  uint32   `json:"initial_max_stream_data_bidi_local_len,omitempty"`
-	InitialMaxStreamDataBidiLocal        []byte   `json:"initial_max_stream_data_bidi_local,omitempty"`
-	InitialMaxStreamDataBidiRemoteLength uint32   `json:"initial_max_stream_data_bidi_remote_len,omitempty"`
-	InitialMaxStreamDataBidiRemote       []byte   `json:"initial_max_stream_data_bidi_remote,omitempty"`
-	InitialMaxStreamDataUniLength        uint32   `json:"initial_max_stream_data_uni_len,omitempty"`
-	InitialMaxStreamDataUni              []byte   `json:"initial_max_stream_data_uni,omitempty"`
-	InitialMaxStreamsBidiLength          uint32   `json:"initial_max_streams_bidi_len,omitempty"`
-	InitialMaxStreamsBidi                []byte   `json:"initial_max_streams_bidi,omitempty"`
-	InitialMaxStreamsUniLength           uint32   `json:"initial_max_streams_uni_len,omitempty"`
-	InitialMaxStreamsUni                 []byte   `json:"initial_max_streams_uni,omitempty"`
-	AckDelayExponentLength               uint32   `json:"ack_delay_exponent_len,omitempty"`
-	AckDelayExponent                     []byte   `json:"ack_delay_exponent,omitempty"`
-	MaxAckDelayLength                    uint32   `json:"max_ack_delay_len,omitempty"`
-	MaxAckDelay                          []byte   `json:"max_ack_delay,omitempty"`
-	ActiveConnectionIDLimitLength        uint32   `json:"active_connection_id_limit_len,omitempty"`
-	ActiveConnectionIDLimit              []byte   `json:"active_connection_id_limit,omitempty"`
-	QTPIDs                               []uint64 `json:"qtpid,omitempty"` // sorted
-	QTPIDSum                             uint64   `json:"qtpid_sum,omitempty"`
+	MaxIdleTimeoutLength                 uint32         `json:"max_idle_timeout_len,omitempty"`
+	MaxIdleTimeout                       utils.Uint8Arr `json:"max_idle_timeout,omitempty"`
+	MaxUDPPayloadSizeLength              uint32         `json:"max_udp_payload_size_len,omitempty"`
+	MaxUDPPayloadSize                    utils.Uint8Arr `json:"max_udp_payload_size,omitempty"`
+	InitialMaxDataLength                 uint32         `json:"initial_max_data_len,omitempty"`
+	InitialMaxData                       utils.Uint8Arr `json:"initial_max_data,omitempty"`
+	InitialMaxStreamDataBidiLocalLength  uint32         `json:"initial_max_stream_data_bidi_local_len,omitempty"`
+	InitialMaxStreamDataBidiLocal        utils.Uint8Arr `json:"initial_max_stream_data_bidi_local,omitempty"`
+	InitialMaxStreamDataBidiRemoteLength uint32         `json:"initial_max_stream_data_bidi_remote_len,omitempty"`
+	InitialMaxStreamDataBidiRemote       utils.Uint8Arr `json:"initial_max_stream_data_bidi_remote,omitempty"`
+	InitialMaxStreamDataUniLength        uint32         `json:"initial_max_stream_data_uni_len,omitempty"`
+	InitialMaxStreamDataUni              utils.Uint8Arr `json:"initial_max_stream_data_uni,omitempty"`
+	InitialMaxStreamsBidiLength          uint32         `json:"initial_max_streams_bidi_len,omitempty"`
+	InitialMaxStreamsBidi                utils.Uint8Arr `json:"initial_max_streams_bidi,omitempty"`
+	InitialMaxStreamsUniLength           uint32         `json:"initial_max_streams_uni_len,omitempty"`
+	InitialMaxStreamsUni                 utils.Uint8Arr `json:"initial_max_streams_uni,omitempty"`
+	AckDelayExponentLength               uint32         `json:"ack_delay_exponent_len,omitempty"`
+	AckDelayExponent                     utils.Uint8Arr `json:"ack_delay_exponent,omitempty"`
+	MaxAckDelayLength                    uint32         `json:"max_ack_delay_len,omitempty"`
+	MaxAckDelay                          utils.Uint8Arr `json:"max_ack_delay,omitempty"`
+	ActiveConnectionIDLimitLength        uint32         `json:"active_connection_id_limit_len,omitempty"`
+	ActiveConnectionIDLimit              utils.Uint8Arr `json:"active_connection_id_limit,omitempty"`
+	QTPIDs                               []uint64       `json:"qtpid,omitempty"` // sorted
+	QTPIDSum                             uint64         `json:"qtpid_sum,omitempty"`
 
 	parseError error
 }

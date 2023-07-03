@@ -7,12 +7,8 @@ import (
 	"github.com/gaukas/godicttls"
 )
 
-func TestParseQUICTransportParameters(t *testing.T) {
-	t.Run("Google Chrome", parseQUICTransportParametersGoogleChrome)
-}
-
-func parseQUICTransportParametersGoogleChrome(t *testing.T) {
-	var rawQTPExtData = []byte{
+var (
+	rawQTPExtDataGoogleChrome = []byte{
 		0x09, 0x02, 0x40, 0x67, // initial_max_streams_uni
 		0x0f, 0x00, // initial_source_connection_id
 		0x01, 0x04, 0x80, 0x00, 0x75, 0x30, // max_idle_timeout
@@ -29,7 +25,7 @@ func parseQUICTransportParametersGoogleChrome(t *testing.T) {
 		0x04, 0x04, 0x80, 0xf0, 0x00, 0x00, // initial_max_data
 	}
 
-	var expected *QUICTransportParameters = &QUICTransportParameters{
+	expectedQTPGoogleChrome *QUICTransportParameters = &QUICTransportParameters{
 		MaxIdleTimeoutLength:                 4,
 		MaxIdleTimeout:                       []byte{0x00, 0x00, 0x75, 0x30},
 		MaxUDPPayloadSizeLength:              2,
@@ -68,12 +64,16 @@ func parseQUICTransportParametersGoogleChrome(t *testing.T) {
 			godicttls.QUICTransportParameter_google_version,
 			0xff73db, // godicttls.QUICTransportParameter_version_information,
 		},
+		QTPIDSum: 16772298,
 	}
-	for _, id := range expected.QTPIDs {
-		expected.QTPIDSum += id
-	}
+)
 
-	qtp := ParseQUICTransportParameters(rawQTPExtData)
+func TestParseQUICTransportParameters(t *testing.T) {
+	t.Run("Google Chrome", parseQUICTransportParametersGoogleChrome)
+}
+
+func parseQUICTransportParametersGoogleChrome(t *testing.T) {
+	qtp := ParseQUICTransportParameters(rawQTPExtDataGoogleChrome)
 	if qtp == nil {
 		t.Errorf("ParseQUICTransportParameters failed: got nil")
 		return
@@ -84,7 +84,7 @@ func parseQUICTransportParametersGoogleChrome(t *testing.T) {
 		return
 	}
 
-	if !reflect.DeepEqual(qtp, expected) {
-		t.Errorf("ParseQUICTransportParameters failed: expected %v, got %v", expected, qtp)
+	if !reflect.DeepEqual(qtp, expectedQTPGoogleChrome) {
+		t.Errorf("ParseQUICTransportParameters failed: expected %v, got %v", expectedQTPGoogleChrome, qtp)
 	}
 }
