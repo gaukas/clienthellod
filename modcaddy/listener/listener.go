@@ -115,12 +115,12 @@ func (lw *ListenerWrapper) udpLoop() {
 		udpAddr := &net.UDPAddr{IP: ipAddr.IP, Port: int(udpPkt.SrcPort)}
 		// lw.logger.Debug("Parsed UDP packet from " + udpAddr.String())
 
-		qch, err := clienthellod.ParseQClientHello(udpPkt.Payload)
+		cip, err := clienthellod.ParseQUICCIP(udpPkt.Payload)
 		if err != nil {
 			continue
 		}
 		// lw.logger.Debug("Depositing QClientHello from " + ipAddr.String())
-		lw.reservoir.DepositQClientHello(udpAddr.String(), qch)
+		lw.reservoir.DepositQUICCIP(udpAddr.String(), cip)
 	}
 }
 
@@ -146,12 +146,12 @@ func (lw *ListenerWrapper) udp6Loop() {
 		udpAddr := &net.UDPAddr{IP: ipAddr.IP, Port: int(udpPkt.SrcPort)}
 		// lw.logger.Debug("Parsed UDP packet from " + udpAddr.String())
 
-		qch, err := clienthellod.ParseQClientHello(udpPkt.Payload)
+		cip, err := clienthellod.ParseQUICCIP(udpPkt.Payload)
 		if err != nil {
 			continue
 		}
 		// lw.logger.Debug("Depositing QClientHello from " + ipAddr.String())
-		lw.reservoir.DepositQClientHello(udpAddr.String(), qch)
+		lw.reservoir.DepositQUICCIP(udpAddr.String(), cip)
 	}
 }
 

@@ -132,7 +132,7 @@ func (h *Handler) serveHTTP(wr http.ResponseWriter, req *http.Request, next cadd
 func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error {
 	// get the client hello from the reservoir
 	h.logger.Debug(fmt.Sprintf("Withdrawing QUIC client hello from %s", req.RemoteAddr))
-	qch := h.reservoir.WithdrawQClientHello(req.RemoteAddr)
+	qch := h.reservoir.WithdrawQUICCIP(req.RemoteAddr)
 	if qch == nil {
 		h.logger.Debug(fmt.Sprintf("Can't withdraw QUIC client hello from %s, is it not a QUIC connection?", req.RemoteAddr))
 		return next.ServeHTTP(wr, req)

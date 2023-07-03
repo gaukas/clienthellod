@@ -34,11 +34,11 @@ type Reservoir struct {
 	}
 	mutex *sync.Mutex
 
-	qchMap map[string]*struct {
-		qch    *clienthellod.QClientHello
+	cipMap map[string]*struct {
+		cip    *clienthellod.ClientInitialPacket
 		expiry time.Time
-	}
-	qmutex *sync.Mutex
+	} // QUIC Client Initial Packet
+	qmutex *sync.Mutex // QUIC mutex
 
 	ticker *time.Ticker
 	logger *zap.Logger
@@ -58,8 +58,8 @@ func (Reservoir) CaddyModule() caddy.ModuleInfo {
 					expiry time.Time
 				}),
 				mutex: new(sync.Mutex),
-				qchMap: make(map[string]*struct {
-					qch    *clienthellod.QClientHello
+				cipMap: make(map[string]*struct {
+					cip    *clienthellod.ClientInitialPacket
 					expiry time.Time
 				}),
 				qmutex: new(sync.Mutex),
@@ -79,15 +79,15 @@ func (r *Reservoir) DepositClientHello(addr string, ch *clienthellod.ClientHello
 	}{ch, time.Now().Add(time.Duration(r.ValidFor))}
 }
 
-// DepositQClientHello stores the QUIC ClientHello extracted from the incoming QUIC
-// connection into the reservoir, with the client address as the key.
-func (r *Reservoir) DepositQClientHello(addr string, qch *clienthellod.QClientHello) {
+// DepositQUICCIP stores the QUIC Client Initial Packet extracted from the incoming UDP datagram
+// into the reservoir, with the client address as the key.
+func (r *Reservoir) DepositQUICCIP(addr string, cip *clienthellod.ClientInitialPacket) {
 	r.qmutex.Lock()
 	defer r.qmutex.Unlock()
-	r.qchMap[addr] = &struct {
-		qch    *clienthellod.QClientHello
+	r.cipMap[addr] = &struct {
+		cip    *clienthellod.ClientInitialPacket
 		expiry time.Time
-	}{qch, time.Now().Add(time.Duration(r.ValidFor))}
+	}{cip, time.Now().Add(time.Duration(r.ValidFor))}
 }
 
 // WithdrawClientHello retrieves the ClientHello from the reservoir and
@@ -104,16 +104,16 @@ func (r *Reservoir) WithdrawClientHello(addr string) (ch *clienthellod.ClientHel
 	return
 }
 
-// WithdrawQClientHello retrieves the QUIC ClientHello from the reservoir and
+// WithdrawQUICCIP retrieves the QUIC Client Initial Packet from the reservoir and
 // deletes it from the reservoir, using the client address as the key.
-func (r *Reservoir) WithdrawQClientHello(addr string) (qch *clienthellod.QClientHello) {
+func (r *Reservoir) WithdrawQUICCIP(addr string) (cip *clienthellod.ClientInitialPacket) {
 	r.qmutex.Lock()
 	defer r.qmutex.Unlock()
-	if v, ok := r.qchMap[addr]; ok {
+	if v, ok := r.cipMap[addr]; ok {
 		if time.Now().Before(v.expiry) {
-			qch = v.qch
+			cip = v.cip
 		}
-		delete(r.qchMap, addr)
+		delete(r.cipMap, addr)
 	}
 	return
 }
@@ -140,9 +140,9 @@ func (r *Reservoir) Start() error {
 			r.mutex.Unlock()
 
 			r.qmutex.Lock()
-			for k, v := range r.qchMap {
+			for k, v := range r.cipMap {
 				if v.expiry.Before(time.Now()) {
-					delete(r.qchMap, k)
+					delete(r.cipMap, k)
 				}
 			}
 			r.qmutex.Unlock()

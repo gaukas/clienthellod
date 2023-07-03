@@ -11,6 +11,7 @@ import (
 	"sort"
 
 	"github.com/gaukas/clienthellod/internal/utils"
+	"github.com/gaukas/godicttls"
 	tls "github.com/refraction-networking/utls"
 	"golang.org/x/crypto/cryptobyte"
 )
@@ -54,6 +55,9 @@ type ClientHello struct {
 	keyshareGroupsWithLengths       []uint16
 	nid                             int64
 	norm_nid                        int64
+
+	// QUIC-only
+	qtp *QUICTransportParameters
 }
 
 // ReadClientHello reads a ClientHello from a connection (io.Reader)
@@ -150,6 +154,10 @@ func (ch *ClientHello) ParseClientHello() error {
 			}
 		case *tls.ApplicationSettingsExtension:
 			ch.ApplicationSettings = ext.SupportedProtocols
+		case *tls.GenericExtension:
+			if ext.Id == godicttls.ExtType_quic_transport_parameters {
+				ch.qtp = ParseQUICTransportParameters(ext.Data)
+			}
 		}
 	}
 
