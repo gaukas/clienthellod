@@ -3,6 +3,7 @@ package clienthellod
 import (
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/gaukas/clienthellod/internal/utils"
 )
@@ -57,7 +58,38 @@ func ReadAllFrames(r io.Reader) ([]Frame, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// Append the frame
+		frames = append(frames, frame)
 	}
+}
+
+func ReassembleCRYPTOFrames(frames []Frame) ([]byte, error) {
+	var cryptoFrames []Frame = make([]Frame, 0)
+
+	// Collect all CRYPTO frames
+	for _, frame := range frames {
+		if frame.FrameType() == QUICFrame_CRYPTO {
+			cryptoFrames = append(cryptoFrames, frame)
+		}
+	}
+
+	// Sort CRYPTO frames by offset
+	sort.Slice(cryptoFrames, func(i, j int) bool {
+		return cryptoFrames[i].(*CRYPTO).Offset < cryptoFrames[j].(*CRYPTO).Offset
+	})
+
+	// Reassemble CRYPTO frames
+	var reassembled []byte = make([]byte, 0)
+	for _, frame := range cryptoFrames {
+		if uint64(len(reassembled)) == frame.(*CRYPTO).Offset {
+			reassembled = append(reassembled, frame.(*CRYPTO).Data...)
+		} else {
+			return nil, fmt.Errorf("failed to reassemble CRYPTO frames")
+		}
+	}
+
+	return reassembled, nil
 }
 
 // PADDING frame
