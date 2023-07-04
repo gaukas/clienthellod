@@ -1,6 +1,7 @@
 package clienthellod
 
 import (
+	"crypto/sha1" // skipcq: GSC-G505
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -51,7 +52,11 @@ func ParseQUICCIP(p []byte) (*ClientInitialPacket, error) {
 	}
 
 	// Calculate fp
-	NumericID := qHdr.NID() + uint64(ch.FingerprintNID(true)) + uint64(ch.qtp.NumericID)
+	h := sha1.New() // skipcq: GO-S1025, GSC-G401
+	updateU64(h, qHdr.NID())
+	updateU64(h, uint64(ch.FingerprintNID(true)))
+	updateU64(h, ch.qtp.NumericID)
+	NumericID := binary.BigEndian.Uint64(h.Sum(nil))
 	hid := make([]byte, 8)
 	binary.BigEndian.PutUint64(hid, NumericID)
 	HexID := hex.EncodeToString(hid)
