@@ -53,8 +53,8 @@ type ClientHello struct {
 	alpnWithLengths                 []uint8
 	lengthPrefixedCertCompressAlgos []uint8
 	keyshareGroupsWithLengths       []uint16
-	nid                             int64
-	norm_nid                        int64
+	// _nid                            int64
+	// norm_nid                        int64
 
 	// QUIC-only
 	qtp *QUICTransportParameters
@@ -271,12 +271,12 @@ func (ch *ClientHello) parseExtra() error {
 // FingerprintNID calculates fingerprint Numerical ID of ClientHello.
 // Fingerprint is defined by
 func (ch *ClientHello) FingerprintNID(normalized bool) int64 {
-	if normalized && ch.norm_nid != 0 {
-		return ch.norm_nid
+	if normalized && ch.NormNID != 0 {
+		return ch.NormNID
 	}
 
-	if !normalized && ch.nid != 0 {
-		return ch.nid
+	if !normalized && ch.NID != 0 {
+		return ch.NID
 	}
 
 	h := sha1.New() // skipcq: GO-S1025, GSC-G401,
@@ -303,10 +303,10 @@ func (ch *ClientHello) FingerprintNID(normalized bool) int64 {
 	out := int64(binary.BigEndian.Uint64(h.Sum(nil)[:8]))
 
 	if normalized {
-		ch.norm_nid = out
+		// ch.norm_nid = out
 		ch.NormNID = out
 	} else {
-		ch.nid = out
+		// ch._nid = out
 		ch.NID = out
 	}
 

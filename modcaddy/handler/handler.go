@@ -75,16 +75,16 @@ func (h *Handler) ServeHTTP(wr http.ResponseWriter, req *http.Request, next cadd
 	h.logger.Debug("Sering HTTP to " + req.RemoteAddr + " on Protocol " + req.Proto)
 
 	if h.TLS && req.ProtoMajor <= 2 { // HTTP/1.0, HTTP/1.1, H2
-		return h.serveHTTP(wr, req, next) // TLS ClientHello capture enabled, serve ClientHello
+		return h.serveHTTP12(wr, req, next) // TLS ClientHello capture enabled, serve ClientHello
 	} else if h.QUIC && req.ProtoMajor == 3 { // QUIC
 		return h.serveQUIC(wr, req, next)
 	}
 	return next.ServeHTTP(wr, req)
 }
 
-// serveHTTP handles HTTP/1.0, HTTP/1.1, H2 requests by looking up the
+// serveHTTP12 handles HTTP/1.0, HTTP/1.1, H2 requests by looking up the
 // ClientHello from the reservoir and writing it to the response.
-func (h *Handler) serveHTTP(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
+func (h *Handler) serveHTTP12(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
 	// get the client hello from the reservoir
 	ch := h.reservoir.WithdrawClientHello(req.RemoteAddr)
 	if ch == nil {
@@ -120,7 +120,7 @@ func (h *Handler) serveHTTP(wr http.ResponseWriter, req *http.Request, next cadd
 	h.logger.Debug("ClientHello: " + string(b))
 	wr.Header().Set("Content-Type", "application/json")
 	wr.Header().Set("Connection", "close")
-	wr.Header().Set("Alt-Svc", "")
+	wr.Header().Set("Alt-Svc", "clear") // to invalidate QUIC
 	_, err = wr.Write(b)
 	if err != nil {
 		h.logger.Error("failed to write response", zap.Error(err))

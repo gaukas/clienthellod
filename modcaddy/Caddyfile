@@ -1,8 +1,8 @@
 {      
     debug
-    http_port    7080
-	https_port   7443
-    order clienthellod before file_server
+    # http_port    7080
+	# https_port   7443
+    order clienthellod before file_server # make sure handler before file_server
     clienthellod { # app (reservoir)
         validfor 20s 30s
     }
@@ -14,12 +14,14 @@
             }
             tls
         }
+        # protocols h3
     }
 }
 
-172.21.190.119, localhost, 127.0.0.1 {
+1.mydomain.com {
     tls internal
     clienthellod { # handler
+        # quic # mutually exclusive with tls
         tls # listener_wrappers.clienthellod.tcp must be set
     }
     file_server {
@@ -27,12 +29,13 @@
     }
 }
 
-# 127.0.0.2 {
-#     tls internal
-#     clienthellod { # handler
-#         quic # listener_wrappers.clienthellod.udp must be set
-#     }
-#     file_server {
-#         root /var/www/html
-#     }
-# }
+2.mydomain.com {
+    tls internal
+    clienthellod { # handler
+        quic # listener_wrappers.clienthellod.udp must be set
+        # tls # mutually exclusive with quic
+    }
+    file_server {
+        root /var/www/html
+    }
+}
