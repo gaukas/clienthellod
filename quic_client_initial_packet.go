@@ -5,9 +5,7 @@ import (
 	"fmt"
 )
 
-var (
-	ErrNoQUICClientHello = errors.New("no QUIC ClientHello found in the packet")
-)
+var ErrNoQUICClientHello = errors.New("no QUIC ClientHello found in the packet")
 
 type ClientInitialPacket struct {
 	raw []byte

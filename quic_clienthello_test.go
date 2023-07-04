@@ -149,5 +149,4 @@ func testParseQUICClientHelloGoogleChrome(t *testing.T) {
 	if !reflect.DeepEqual(qch.qtp, expectedQTPGoogleChrome) {
 		t.Errorf("ParseQUICTransportParameters failed: expected %v, got %v", expectedQTPGoogleChrome, qch.qtp)
 	}
-
 }
