@@ -132,38 +132,29 @@ func (h *Handler) serveHTTP(wr http.ResponseWriter, req *http.Request, next cadd
 func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error {
 	// get the client hello from the reservoir
 	h.logger.Debug(fmt.Sprintf("Withdrawing QUIC client hello from %s", req.RemoteAddr))
-	qch := h.reservoir.WithdrawQUICCIP(req.RemoteAddr)
-	if qch == nil {
+	cip := h.reservoir.WithdrawQUICCIP(req.RemoteAddr)
+	if cip == nil {
 		h.logger.Debug(fmt.Sprintf("Can't withdraw QUIC client hello from %s, is it not a QUIC connection?", req.RemoteAddr))
 		return next.ServeHTTP(wr, req)
 	}
 	h.logger.Debug(fmt.Sprintf("Withdrew QUIC client hello from %s", req.RemoteAddr))
 
-	err := qch.ParseClientHello()
+	cip.UserAgent = req.UserAgent()
+
+	// dump JSON
+	var b []byte
+	var err error
+	if req.URL.Query().Get("beautify") == "true" {
+		b, err = json.MarshalIndent(cip, "", "  ")
+	} else {
+		b, err = json.Marshal(cip)
+	}
 	if err != nil {
-		h.logger.Error("failed to parse QUIC client hello", zap.Error(err))
+		h.logger.Error("failed to marshal QUIC client hello", zap.Error(err))
 		return next.ServeHTTP(wr, req)
 	}
 
-	h.logger.Debug("ClientHello ID: " + qch.FingerprintID(false))
-	h.logger.Debug("ClientHello NormID: " + qch.FingerprintID(true))
-	h.logger.Debug("User-Agent: " + req.UserAgent())
-	qch.UserAgent = req.UserAgent()
-
-	// dump JSON
-	var b []byte = []byte(qch.Raw()) // TODO: this is for debugging only.
-	// if req.URL.Query().Get("beautify") == "true" {
-	// 	b, err = json.MarshalIndent(qch, "", "  ")
-	// } else {
-	// 	b, err = json.Marshal(qch)
-	// }
-	// if err != nil {
-	// 	h.logger.Error("failed to marshal QUIC client hello", zap.Error(err))
-	// 	return next.ServeHTTP(wr, req)
-	// }
-
 	// write JSON to response
-	h.logger.Debug("QClientHello FP: " + qch.FingerprintID(false))
 	wr.Header().Set("Content-Type", "application/json")
 	wr.Header().Set("Connection", "close")
 	_, err = wr.Write(b)

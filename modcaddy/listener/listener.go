@@ -112,11 +112,15 @@ func (lw *ListenerWrapper) udpLoop() {
 			lw.logger.Error("Failed to parse UDP packet", zap.Error(err))
 			continue
 		}
+		if udpPkt.DstPort != 443 {
+			continue
+		}
 		udpAddr := &net.UDPAddr{IP: ipAddr.IP, Port: int(udpPkt.SrcPort)}
 		// lw.logger.Debug("Parsed UDP packet from " + udpAddr.String())
 
 		cip, err := clienthellod.ParseQUICCIP(udpPkt.Payload)
 		if err != nil {
+			lw.logger.Debug("Failed to parse QUIC CIP: ", zap.Error(err))
 			continue
 		}
 		// lw.logger.Debug("Depositing QClientHello from " + ipAddr.String())
