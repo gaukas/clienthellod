@@ -161,6 +161,7 @@ func (qtp *QUICTransportParameters) NID() uint64 {
 	updateArr(h, qtp.MaxAckDelay)
 	updateArr(h, qtp.ActiveConnectionIDLimit)
 
+	updateU32(h, uint32(len(qtp.QTPIDs)))
 	for _, id := range qtp.QTPIDs {
 		updateU64(h, id)
 	}
