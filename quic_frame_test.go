@@ -7,7 +7,7 @@ import (
 )
 
 func TestPADDING(t *testing.T) {
-	var randLen int = rand.Int() % 512
+	var randLen int = rand.Int() % 512 // skipcq: GSC-G404
 	var rdBuf []byte = make([]byte, randLen+5)
 	copy(rdBuf[randLen:], []byte("hello"))
 
