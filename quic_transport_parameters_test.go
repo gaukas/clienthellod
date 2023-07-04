@@ -26,27 +26,16 @@ var (
 	}
 
 	expectedQTPGoogleChrome *QUICTransportParameters = &QUICTransportParameters{
-		MaxIdleTimeoutLength:                 4,
-		MaxIdleTimeout:                       []byte{0x00, 0x00, 0x75, 0x30},
-		MaxUDPPayloadSizeLength:              2,
-		MaxUDPPayloadSize:                    []byte{0x05, 0xc0},
-		InitialMaxDataLength:                 4,
-		InitialMaxData:                       []byte{0x00, 0xf0, 0x00, 0x00},
-		InitialMaxStreamDataBidiLocalLength:  4,
-		InitialMaxStreamDataBidiLocal:        []byte{0x00, 0x60, 0x00, 0x00},
-		InitialMaxStreamDataBidiRemoteLength: 4,
-		InitialMaxStreamDataBidiRemote:       []byte{0x00, 0x60, 0x00, 0x00},
-		InitialMaxStreamDataUniLength:        4,
-		InitialMaxStreamDataUni:              []byte{0x00, 0x60, 0x00, 0x00},
-		InitialMaxStreamsBidiLength:          2,
-		InitialMaxStreamsBidi:                []byte{0x00, 0x64},
-		InitialMaxStreamsUniLength:           2,
-		InitialMaxStreamsUni:                 []byte{0x00, 0x67},
-		AckDelayExponentLength:               0,
+		MaxIdleTimeout:                 []byte{0x00, 0x00, 0x75, 0x30},
+		MaxUDPPayloadSize:              []byte{0x05, 0xc0},
+		InitialMaxData:                 []byte{0x00, 0xf0, 0x00, 0x00},
+		InitialMaxStreamDataBidiLocal:  []byte{0x00, 0x60, 0x00, 0x00},
+		InitialMaxStreamDataBidiRemote: []byte{0x00, 0x60, 0x00, 0x00},
+		InitialMaxStreamDataUni:        []byte{0x00, 0x60, 0x00, 0x00},
+		InitialMaxStreamsBidi:          []byte{0x00, 0x64},
+		InitialMaxStreamsUni:           []byte{0x00, 0x67},
 		// AckDelayExponent:                     []byte{}, // nil
-		MaxAckDelayLength: 0,
 		// MaxAckDelay:                          []byte{}, // nil
-		ActiveConnectionIDLimitLength: 0,
 		// ActiveConnectionIDLimit:              []byte{}, // nil
 		QTPIDs: []uint64{
 			godicttls.QUICTransportParameter_max_idle_timeout,
@@ -64,7 +53,6 @@ var (
 			godicttls.QUICTransportParameter_google_version,
 			0xff73db, // godicttls.QUICTransportParameter_version_information,
 		},
-		QTPIDSum: 16772298,
 	}
 )
 

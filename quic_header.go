@@ -2,8 +2,10 @@ package clienthellod
 
 import (
 	"bytes"
+	"crypto/sha1" // skipcq: GSC-G505
+	"encoding/binary"
+	"encoding/hex"
 	"errors"
-	"sort"
 
 	"github.com/gaukas/clienthellod/internal/utils"
 	"golang.org/x/crypto/cryptobyte"
@@ -14,21 +16,27 @@ var (
 	ErrNotQUICInitialPacket    = errors.New("packet is not a QUIC Initial Packet")
 )
 
+// QUICHeader includes header fields of a QUIC packet and the following
+// frames. It is used to calculate the fingerprint of a QUIC Header.
 type QUICHeader struct {
-	InitialPacketNumberLength uint32         `json:"pn_len,omitempty"`  // TODO: from Packet Header Byte, +1 or not?
-	VersionLength             uint32         `json:"ver_len,omitempty"` // TODO: is it not fixed 4-byte?
 	Version                   utils.Uint8Arr `json:"version,omitempty"` // 4-byte version
 	DCIDLength                uint32         `json:"dcid_len,omitempty"`
 	SCIDLength                uint32         `json:"scid_len,omitempty"`
-	TokenLength               uint32         `json:"token_len,omitempty"`
-	InitialPacketNumber       uint32         `json:"pn,omitempty"` // TODO: protected or unprotected?
+	PacketNumber              utils.Uint8Arr `json:"pn,omitempty"` // VLI
+	initialPacketNumberLength uint32
+	initialPacketNumber       uint64
 
 	// These two fields are not strictly part of QUIC header, but we need them before parsing QUIC ClientHello
-	FramesPresentLength uint32   `json:"frames_present_len,omitempty"` // TODO: length of all frames OR number of frames?
-	FrameIDs            []uint32 `json:"frame_id,omitempty"`           // sorted
-	frames              []Frame
+	FrameIDs utils.Uint8Arr `json:"frame_id,omitempty"` // sorted
+	frames   []Frame
+
+	TokenLength uint32 `json:"token_len,omitempty"`
+
+	HexID     string `json:"hdrid,omitempty"`
+	NumericID uint64 `json:"hdrnid,omitempty"`
 }
 
+// DecodeQUICHeaderAndFrames decodes a QUIC initial packet and returns a QUICHeader.
 func DecodeQUICHeaderAndFrames(p []byte) (*QUICHeader, error) {
 	// make a copy of the packet, so we can use it for crypto later
 	recdata := make([]byte, len(p))
@@ -52,10 +60,7 @@ func DecodeQUICHeaderAndFrames(p []byte) (*QUICHeader, error) {
 
 	// LSB of the first byte is protected, we will resolve it later
 
-	// TODO: QUIC Version is always 4-byte, right?
-	qHdr.VersionLength = 4
 	qHdr.Version = p[1:5]
-
 	s := cryptobyte.String(p[5:])
 	initialRandom := new(cryptobyte.String)
 	if !s.ReadUint8LengthPrefixed(initialRandom) {
@@ -122,23 +127,23 @@ func DecodeQUICHeaderAndFrames(p []byte) (*QUICHeader, error) {
 	// decipher packet header byte
 	headerByte := packetHeaderByteProtected ^ (hp[0] & 0x0f) // only lower 4 bits are protected and thus need to be XORed
 	recdata[0] = headerByte
-	qHdr.InitialPacketNumberLength = uint32(headerByte&0x03) + 1 // LSB lower 2 bits are packet number length (-1)
-	packetNumberBytes := payload[:qHdr.InitialPacketNumberLength]
+	qHdr.initialPacketNumberLength = uint32(headerByte&0x03) + 1 // LSB lower 2 bits are packet number length (-1)
+	packetNumberBytes := payload[:qHdr.initialPacketNumberLength]
 	for i, b := range packetNumberBytes {
 		unprotectedByte := b ^ hp[i+1]
 		recdata = append(recdata, unprotectedByte)
-		qHdr.InitialPacketNumber = qHdr.InitialPacketNumber<<8 + uint32(unprotectedByte)
+		qHdr.initialPacketNumber = qHdr.initialPacketNumber<<8 + uint64(unprotectedByte)
+		qHdr.PacketNumber = append(qHdr.PacketNumber, unprotectedByte)
 	}
 
-	ciphertext := payload[qHdr.InitialPacketNumberLength : len(payload)-16] // payload: [packet number (i-byte)] [encrypted data] [auth tag (16-byte)]
+	ciphertext := payload[qHdr.initialPacketNumberLength : len(payload)-16] // payload: [packet number (i-byte)] [encrypted data] [auth tag (16-byte)]
 	authTag := payload[len(payload)-16:]
 
 	// decipher payload
-	plaintext, err := DecryptAES128GCM(clientIV, uint64(qHdr.InitialPacketNumber), clientKey, ciphertext, recdata, authTag)
+	plaintext, err := DecryptAES128GCM(clientIV, qHdr.initialPacketNumber, clientKey, ciphertext, recdata, authTag)
 	if err != nil {
 		return nil, err
 	}
-	qHdr.FramesPresentLength = uint32(len(plaintext))
 
 	// parse frames
 	qHdr.frames, err = ReadAllFrames(bytes.NewBuffer(plaintext))
@@ -147,14 +152,44 @@ func DecodeQUICHeaderAndFrames(p []byte) (*QUICHeader, error) {
 	}
 
 	for _, f := range qHdr.frames {
-		qHdr.FrameIDs = append(qHdr.FrameIDs, uint32(f.FrameType()))
-		// qHdr.FramesPresentLength++
+		qHdr.FrameIDs = append(qHdr.FrameIDs, uint8(f.FrameType()&0xff))
 	}
 
-	// sort frame IDs
-	sort.Slice(qHdr.FrameIDs, func(i, j int) bool {
-		return qHdr.FrameIDs[i] < qHdr.FrameIDs[j]
-	})
+	// deduplicate frame IDs
+	qHdr.FrameIDs = utils.DedupIntArr(qHdr.FrameIDs)
 
 	return qHdr, nil
+}
+
+// Frames returns all recognized frames in the QUIC header.
+func (qHdr *QUICHeader) Frames() []Frame {
+	return qHdr.frames
+}
+
+// NID returns a numeric fingerprint ID for the QUIC header.
+func (qHdr *QUICHeader) NID() uint64 {
+	if qHdr.NumericID != 0 {
+		return qHdr.NumericID
+	}
+
+	h := sha1.New() // skipcq: GO-S1025, GSC-G401
+	updateArr(h, qHdr.Version)
+	updateU32(h, qHdr.DCIDLength)
+	updateU32(h, qHdr.SCIDLength)
+	updateArr(h, qHdr.PacketNumber)
+	updateArr(h, qHdr.FrameIDs)
+	updateU32(h, qHdr.TokenLength)
+
+	qHdr.NumericID = binary.BigEndian.Uint64(h.Sum(nil)[0:8])
+	return qHdr.NumericID
+}
+
+// HID returns a hex fingerprint ID for the QUIC header.
+func (qHdr *QUICHeader) HID() string {
+	nid := qHdr.NID()
+	hid := make([]byte, 8)
+	binary.BigEndian.PutUint64(hid, nid)
+
+	qHdr.HexID = hex.EncodeToString(hid)
+	return qHdr.HexID
 }

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"hash"
 	"io"
 	"sort"
 
@@ -327,9 +326,4 @@ func (ch *ClientHello) FingerprintID(normalized bool) string {
 		ch.ID = id
 	}
 	return id
-}
-
-func updateArr(h hash.Hash, arr []byte) {
-	binary.Write(h, binary.BigEndian, uint32(len(arr)))
-	h.Write(arr)
 }
