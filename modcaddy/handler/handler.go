@@ -72,6 +72,8 @@ func (h *Handler) Provision(ctx caddy.Context) error {
 }
 
 func (h *Handler) ServeHTTP(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error {
+	h.logger.Debug("Sering HTTP to " + req.RemoteAddr + " on Protocol " + req.Proto)
+
 	if h.TLS && req.ProtoMajor <= 2 { // HTTP/1.0, HTTP/1.1, H2
 		return h.serveHTTP(wr, req, next) // TLS ClientHello capture enabled, serve ClientHello
 	} else if h.QUIC && req.ProtoMajor == 3 { // QUIC
@@ -131,7 +133,6 @@ func (h *Handler) serveHTTP(wr http.ResponseWriter, req *http.Request, next cadd
 // reservoir and writing it to the response.
 func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error {
 	// get the client hello from the reservoir
-	h.logger.Debug(fmt.Sprintf("Withdrawing QUIC client hello from %s", req.RemoteAddr))
 	cip := h.reservoir.WithdrawQUICCIP(req.RemoteAddr)
 	if cip == nil {
 		h.logger.Debug(fmt.Sprintf("Can't withdraw QUIC client hello from %s, is it not a QUIC connection?", req.RemoteAddr))

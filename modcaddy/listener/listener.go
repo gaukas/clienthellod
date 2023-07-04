@@ -147,6 +147,9 @@ func (lw *ListenerWrapper) udp6Loop() {
 			lw.logger.Error("Failed to parse UDP packet", zap.Error(err))
 			continue
 		}
+		if udpPkt.DstPort != 443 {
+			continue
+		}
 		udpAddr := &net.UDPAddr{IP: ipAddr.IP, Port: int(udpPkt.SrcPort)}
 		// lw.logger.Debug("Parsed UDP packet from " + udpAddr.String())
 
@@ -197,8 +200,8 @@ func (l *tlsListener) Accept() (net.Conn, error) {
 
 	ch, err := clienthellod.ReadClientHello(conn)
 	if err == nil {
-		l.logger.Debug("Depositing ClientHello from " + conn.RemoteAddr().String())
 		l.reservoir.DepositClientHello(conn.RemoteAddr().String(), ch)
+		l.logger.Debug("Deposited ClientHello from " + conn.RemoteAddr().String())
 	} else {
 		l.logger.Error("Failed to read ClientHello from "+conn.RemoteAddr().String(), zap.Error(err))
 	}

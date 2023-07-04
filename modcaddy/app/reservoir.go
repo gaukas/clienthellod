@@ -84,6 +84,11 @@ func (r *Reservoir) DepositClientHello(addr string, ch *clienthellod.ClientHello
 func (r *Reservoir) DepositQUICCIP(addr string, cip *clienthellod.ClientInitialPacket) {
 	r.qmutex.Lock()
 	defer r.qmutex.Unlock()
+	r.lockedDepositQUICCIP(addr, cip)
+}
+
+// caller must hold the lock on r.qmutex
+func (r *Reservoir) lockedDepositQUICCIP(addr string, cip *clienthellod.ClientInitialPacket) {
 	r.cipMap[addr] = &struct {
 		cip    *clienthellod.ClientInitialPacket
 		expiry time.Time
@@ -114,6 +119,9 @@ func (r *Reservoir) WithdrawQUICCIP(addr string) (cip *clienthellod.ClientInitia
 			cip = v.cip
 		}
 		delete(r.cipMap, addr)
+		// reinsert the QUIC Client Initial Packet into the reservoir
+		// with a new expiry time
+		r.lockedDepositQUICCIP(addr, cip)
 	}
 	return
 }

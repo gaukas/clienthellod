@@ -41,7 +41,7 @@ func DecodeQUICHeaderAndFrames(p []byte) (*QUICHeader, error) {
 	// check if it's in QUIC long header format:
 	// - MSB highest bit is 1 (long header format)
 	// - MSB 2nd highest bit is 1 (always set for QUIC)
-	if packetHeaderByteProtected&0xc0 == 0 {
+	if packetHeaderByteProtected&0xc0 != 0xc0 {
 		return nil, ErrNotQUICLongHeaderFormat
 	}
 
@@ -79,7 +79,7 @@ func DecodeQUICHeaderAndFrames(p []byte) (*QUICHeader, error) {
 	qHdr.TokenLength = uint32(tokenLen)
 
 	// read token bytes
-	token := make([]byte, tokenLen)
+	token := make([]byte, qHdr.TokenLength)
 	n, err := r.Read(token)
 	if err != nil {
 		return nil, err

@@ -38,10 +38,9 @@ func (c *rewindConn) Read(b []byte) (int, error) {
 		return c.Conn.Read(b)
 	}
 	n, err := c.reader.Read(b)
-	if errors.Is(err, io.EOF) || c.reader.Len() == 0 {
+	if errors.Is(err, io.EOF) {
 		c.reader.Reset([]byte{})
-		n2, err := c.Conn.Read(b[n:]) // read the rest if possible
-		return n + n2, err
+		return n, nil
 	}
 	return n, err
 }
