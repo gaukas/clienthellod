@@ -74,6 +74,10 @@ func ReassembleCRYPTOFrames(frames []Frame) ([]byte, error) {
 		}
 	}
 
+	if len(cryptoFrames) == 0 {
+		return nil, nil // no CRYPTO frames is not an error
+	}
+
 	// Sort CRYPTO frames by offset
 	sort.Slice(cryptoFrames, func(i, j int) bool {
 		return cryptoFrames[i].(*CRYPTO).Offset < cryptoFrames[j].(*CRYPTO).Offset
