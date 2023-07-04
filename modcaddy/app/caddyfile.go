@@ -38,7 +38,7 @@ func parseCaddyfile(d *caddyfile.Dispenser, _ interface{}) (interface{}, error) 
 
 	for d.Next() {
 		for d.NextBlock(0) {
-			switch d.Val() {
+			switch d.Val() { // skipcq: CRT-A0014
 			case "validfor":
 				if app.ValidFor != caddy.Duration(DEFAULT_RESERVOIR_ENTRY_VALID_FOR) {
 					return nil, d.Err("only one valid is allowed")

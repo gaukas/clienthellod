@@ -46,7 +46,7 @@ type Reservoir struct {
 
 // CaddyModule implements CaddyModule() of caddy.Module.
 // It returns the Caddy module information.
-func (Reservoir) CaddyModule() caddy.ModuleInfo {
+func (Reservoir) CaddyModule() caddy.ModuleInfo { // skipcq: GO-W1029
 	return caddy.ModuleInfo{
 		ID: CaddyAppID,
 		New: func() caddy.Module {
@@ -70,7 +70,7 @@ func (Reservoir) CaddyModule() caddy.ModuleInfo {
 
 // DepositClientHello stores the TLS ClientHello extracted from the incoming TLS
 // connection into the reservoir, with the client address as the key.
-func (r *Reservoir) DepositClientHello(addr string, ch *clienthellod.ClientHello) {
+func (r *Reservoir) DepositClientHello(addr string, ch *clienthellod.ClientHello) { // skipcq: GO-W1029
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.chMap[addr] = &struct {
@@ -81,14 +81,14 @@ func (r *Reservoir) DepositClientHello(addr string, ch *clienthellod.ClientHello
 
 // DepositQUICCIP stores the QUIC Client Initial Packet extracted from the incoming UDP datagram
 // into the reservoir, with the client address as the key.
-func (r *Reservoir) DepositQUICCIP(addr string, cip *clienthellod.ClientInitialPacket) {
+func (r *Reservoir) DepositQUICCIP(addr string, cip *clienthellod.ClientInitialPacket) { // skipcq: GO-W1029
 	r.qmutex.Lock()
 	defer r.qmutex.Unlock()
 	r.lockedDepositQUICCIP(addr, cip)
 }
 
 // caller must hold the lock on r.qmutex
-func (r *Reservoir) lockedDepositQUICCIP(addr string, cip *clienthellod.ClientInitialPacket) {
+func (r *Reservoir) lockedDepositQUICCIP(addr string, cip *clienthellod.ClientInitialPacket) { // skipcq: GO-W1029
 	r.cipMap[addr] = &struct {
 		cip    *clienthellod.ClientInitialPacket
 		expiry time.Time
@@ -97,7 +97,7 @@ func (r *Reservoir) lockedDepositQUICCIP(addr string, cip *clienthellod.ClientIn
 
 // WithdrawClientHello retrieves the ClientHello from the reservoir and
 // deletes it from the reservoir, using the client address as the key.
-func (r *Reservoir) WithdrawClientHello(addr string) (ch *clienthellod.ClientHello) {
+func (r *Reservoir) WithdrawClientHello(addr string) (ch *clienthellod.ClientHello) { // skipcq: GO-W1029
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	if v, ok := r.chMap[addr]; ok {
@@ -111,7 +111,7 @@ func (r *Reservoir) WithdrawClientHello(addr string) (ch *clienthellod.ClientHel
 
 // WithdrawQUICCIP retrieves the QUIC Client Initial Packet from the reservoir and
 // deletes it from the reservoir, using the client address as the key.
-func (r *Reservoir) WithdrawQUICCIP(addr string) (cip *clienthellod.ClientInitialPacket) {
+func (r *Reservoir) WithdrawQUICCIP(addr string) (cip *clienthellod.ClientInitialPacket) { // skipcq: GO-W1029
 	r.qmutex.Lock()
 	defer r.qmutex.Unlock()
 	if v, ok := r.cipMap[addr]; ok {
@@ -127,7 +127,7 @@ func (r *Reservoir) WithdrawQUICCIP(addr string) (cip *clienthellod.ClientInitia
 }
 
 // Start implements Start() of caddy.App.
-func (r *Reservoir) Start() error {
+func (r *Reservoir) Start() error { // skipcq: GO-W1029
 	if r.ValidFor <= 0 {
 		r.ValidFor = caddy.Duration(DEFAULT_RESERVOIR_ENTRY_VALID_FOR)
 	}
@@ -160,7 +160,7 @@ func (r *Reservoir) Start() error {
 }
 
 // Stop implements Stop() of caddy.App.
-func (r *Reservoir) Stop() error {
+func (r *Reservoir) Stop() error { // skipcq: GO-W1029
 	if r.ticker == nil {
 		return errors.New("reservoir is not started")
 	}
@@ -169,7 +169,7 @@ func (r *Reservoir) Stop() error {
 }
 
 // Provision implements Provision() of caddy.Provisioner.
-func (r *Reservoir) Provision(ctx caddy.Context) error {
+func (r *Reservoir) Provision(ctx caddy.Context) error { // skipcq: GO-W1029
 	r.logger = ctx.Logger(r)
 	r.logger.Info("clienthellod reservoir is provisioned")
 	return nil

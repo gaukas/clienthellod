@@ -38,7 +38,7 @@ type Handler struct {
 }
 
 // CaddyModule returns the Caddy module information.
-func (Handler) CaddyModule() caddy.ModuleInfo {
+func (Handler) CaddyModule() caddy.ModuleInfo { // skipcq: GO-W1029
 	return caddy.ModuleInfo{
 		ID:  "http.handlers.clienthellod",
 		New: func() caddy.Module { return new(Handler) },
@@ -46,7 +46,7 @@ func (Handler) CaddyModule() caddy.ModuleInfo {
 }
 
 // Provision implements caddy.Provisioner.
-func (h *Handler) Provision(ctx caddy.Context) error {
+func (h *Handler) Provision(ctx caddy.Context) error { // skipcq: GO-W1029
 	h.logger = ctx.Logger(h)
 	h.logger.Info("clienthellod handler logger loaded.")
 
@@ -71,7 +71,7 @@ func (h *Handler) Provision(ctx caddy.Context) error {
 	return nil
 }
 
-func (h *Handler) ServeHTTP(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error {
+func (h *Handler) ServeHTTP(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
 	h.logger.Debug("Sering HTTP to " + req.RemoteAddr + " on Protocol " + req.Proto)
 
 	if h.TLS && req.ProtoMajor <= 2 { // HTTP/1.0, HTTP/1.1, H2
@@ -84,7 +84,7 @@ func (h *Handler) ServeHTTP(wr http.ResponseWriter, req *http.Request, next cadd
 
 // serveHTTP handles HTTP/1.0, HTTP/1.1, H2 requests by looking up the
 // ClientHello from the reservoir and writing it to the response.
-func (h *Handler) serveHTTP(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error {
+func (h *Handler) serveHTTP(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
 	// get the client hello from the reservoir
 	ch := h.reservoir.WithdrawClientHello(req.RemoteAddr)
 	if ch == nil {
@@ -131,7 +131,7 @@ func (h *Handler) serveHTTP(wr http.ResponseWriter, req *http.Request, next cadd
 
 // serveQUIC handles QUIC requests by looking up the ClientHello from the
 // reservoir and writing it to the response.
-func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error {
+func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
 	// get the client hello from the reservoir
 	cip := h.reservoir.WithdrawQUICCIP(req.RemoteAddr)
 	if cip == nil {
@@ -167,7 +167,7 @@ func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next cadd
 }
 
 // UnmarshalCaddyfile unmarshals Caddyfile tokens into h.
-func (h *Handler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
+func (h *Handler) UnmarshalCaddyfile(d *caddyfile.Dispenser) error { // skipcq: GO-W1029
 	for d.Next() {
 		for d.NextBlock(0) {
 			switch d.Val() {

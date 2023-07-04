@@ -1,7 +1,7 @@
 package clienthellod
 
 import (
-	"crypto/sha1"
+	"crypto/sha1" // skipcq: GSC-G505
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -279,7 +279,7 @@ func (ch *ClientHello) FingerprintNID(normalized bool) int64 {
 		return ch.nid
 	}
 
-	h := sha1.New()
+	h := sha1.New() // skipcq: GO-S1025, GSC-G401,
 	binary.Write(h, binary.BigEndian, uint16(ch.TLSRecordVersion))
 	binary.Write(h, binary.BigEndian, uint16(ch.TLSHandshakeVersion))
 

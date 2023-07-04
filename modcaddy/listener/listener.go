@@ -39,14 +39,14 @@ type ListenerWrapper struct {
 }
 
 // CaddyModule returns the Caddy module information.
-func (ListenerWrapper) CaddyModule() caddy.ModuleInfo {
+func (ListenerWrapper) CaddyModule() caddy.ModuleInfo { // skipcq: GO-W1029
 	return caddy.ModuleInfo{
 		ID:  "caddy.listeners.clienthellod",
 		New: func() caddy.Module { return new(ListenerWrapper) },
 	}
 }
 
-func (lw *ListenerWrapper) Cleanup() error {
+func (lw *ListenerWrapper) Cleanup() error { // skipcq: GO-W1029
 	if lw.UDP && lw.udpListener != nil {
 		return lw.udpListener.Close()
 	}
@@ -56,7 +56,7 @@ func (lw *ListenerWrapper) Cleanup() error {
 	return nil
 }
 
-func (lw *ListenerWrapper) Provision(ctx caddy.Context) error {
+func (lw *ListenerWrapper) Provision(ctx caddy.Context) error { // skipcq: GO-W1029
 	// logger
 	lw.logger = ctx.Logger(lw)
 	lw.logger.Info("clienthellod listener logger loaded.")
@@ -93,7 +93,7 @@ func (lw *ListenerWrapper) Provision(ctx caddy.Context) error {
 	return nil
 }
 
-func (lw *ListenerWrapper) udpLoop() {
+func (lw *ListenerWrapper) udpLoop() { // skipcq: GO-W1029
 	for {
 		var buf [2048]byte
 		n, ipAddr, err := lw.udpListener.ReadFromIP(buf[:])
@@ -128,7 +128,7 @@ func (lw *ListenerWrapper) udpLoop() {
 	}
 }
 
-func (lw *ListenerWrapper) udp6Loop() {
+func (lw *ListenerWrapper) udp6Loop() { // skipcq: GO-W1029
 	for {
 		var buf [2048]byte
 		n, ipAddr, err := lw.udp6Listener.ReadFromIP(buf[:])
@@ -162,7 +162,7 @@ func (lw *ListenerWrapper) udp6Loop() {
 	}
 }
 
-func (lw *ListenerWrapper) WrapListener(l net.Listener) net.Listener {
+func (lw *ListenerWrapper) WrapListener(l net.Listener) net.Listener { // skipcq: GO-W1029
 	lw.logger.Info("Wrapping listener " + l.Addr().String() + "on network " + l.Addr().Network() + "...")
 
 	if l.Addr().Network() == "tcp" || l.Addr().Network() == "tcp4" || l.Addr().Network() == "tcp6" {
@@ -210,7 +210,7 @@ func (l *tlsListener) Accept() (net.Conn, error) {
 	return utils.RewindConn(conn, ch.Raw())
 }
 
-func (lw *ListenerWrapper) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
+func (lw *ListenerWrapper) UnmarshalCaddyfile(d *caddyfile.Dispenser) error { // skipcq: GO-W1029
 	for d.Next() {
 		for d.NextBlock(0) {
 			switch d.Val() {

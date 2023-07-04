@@ -102,7 +102,7 @@ type PADDING struct {
 }
 
 // FrameType implements Frame interface.
-func (f *PADDING) FrameType() uint64 {
+func (*PADDING) FrameType() uint64 {
 	return QUICFrame_PADDING
 }
 
@@ -134,13 +134,13 @@ func (f *PADDING) ReadReader(r io.Reader) (rr io.Reader, err error) {
 type PING struct{}
 
 // FrameType implements Frame interface.
-func (f *PING) FrameType() uint64 {
+func (*PING) FrameType() uint64 {
 	return QUICFrame_PING
 }
 
 // ReadFrom implements Frame interface. It does nothing and returns the
 // input reader.
-func (f *PING) ReadReader(r io.Reader) (rr io.Reader, err error) {
+func (*PING) ReadReader(r io.Reader) (rr io.Reader, err error) {
 	return r, nil
 }
 
@@ -152,7 +152,7 @@ type CRYPTO struct {
 }
 
 // FrameType implements Frame interface.
-func (f *CRYPTO) FrameType() uint64 {
+func (*CRYPTO) FrameType() uint64 {
 	return QUICFrame_CRYPTO
 }
 
