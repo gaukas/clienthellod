@@ -4,7 +4,7 @@
 	# https_port   7443
     order clienthellod before file_server # make sure handler before file_server
     clienthellod { # app (reservoir)
-        validfor 20s 30s
+        validfor 120s 30s # params: validFor [cleanEvery] # increased for QUIC
     }
     servers {
         listener_wrappers {
@@ -19,7 +19,7 @@
 }
 
 1.mydomain.com {
-    tls internal
+    # tls internal
     clienthellod { # handler
         # quic # mutually exclusive with tls
         tls # listener_wrappers.clienthellod.tcp must be set
@@ -30,7 +30,7 @@
 }
 
 2.mydomain.com {
-    tls internal
+    # tls internal
     clienthellod { # handler
         quic # listener_wrappers.clienthellod.udp must be set
         # tls # mutually exclusive with quic
