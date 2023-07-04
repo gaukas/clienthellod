@@ -31,7 +31,7 @@ type QUICHeader struct {
 
 func DecodeQUICHeaderAndFrames(p []byte) (*QUICHeader, error) {
 	// make a copy of the packet, so we can use it for crypto later
-	var recdata = make([]byte, len(p))
+	recdata := make([]byte, len(p))
 	copy(recdata, p)
 
 	var qHdr *QUICHeader = &QUICHeader{}
