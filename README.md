@@ -1,4 +1,8 @@
 # clienthellod
+![Go Build Status](https://github.com/gaukas/clienthellod/actions/workflows/go.yml/badge.svg)
+[![Go Report Card](https://goreportcard.com/badge/github.com/gaukas/clienthellod)](https://goreportcard.com/report/github.com/gaukas/clienthellod)
+[![DeepSource](https://app.deepsource.com/gh/gaukas/clienthellod.svg/?label=active+issues&show_trend=true&token=GugDSBnYAxAF25QNpfyAO5d2)](https://app.deepsource.com/gh/gaukas/clienthellod/)
+
 ClientHello Parser/Resolver as a Service from [tlsfingerprint.io](https://tlsfingerprint.io).
 
 ## What does it do
