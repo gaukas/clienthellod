@@ -20,12 +20,12 @@ var headerTestMap = map[string]struct {
 func TestDecodeQUICHeaderAndFrames(t *testing.T) {
 	for name, test := range headerTestMap {
 		t.Run(name, func(t *testing.T) {
-			testDecodeQUICHeaderAndFrames(t, test.data, test.truth)
+			testcaseDecodeQUICHeaderAndFrames(t, test.data, test.truth)
 		})
 	}
 }
 
-func testDecodeQUICHeaderAndFrames(t *testing.T, data []byte, truth *QUICHeader) {
+func testcaseDecodeQUICHeaderAndFrames(t *testing.T, data []byte, truth *QUICHeader) {
 	qHdr, err := DecodeQUICHeaderAndFrames(data)
 	if err != nil {
 		t.Fatal(err)
