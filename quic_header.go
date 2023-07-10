@@ -38,6 +38,10 @@ type QUICHeader struct {
 
 // DecodeQUICHeaderAndFrames decodes a QUIC initial packet and returns a QUICHeader.
 func DecodeQUICHeaderAndFrames(p []byte) (*QUICHeader, error) {
+	if len(p) < 7 { // at least 7 bytes before TokenLength
+		return nil, errors.New("packet too short")
+	}
+
 	// make a copy of the packet, so we can use it for crypto later
 	recdata := make([]byte, len(p))
 	copy(recdata, p)
@@ -97,6 +101,9 @@ func DecodeQUICHeaderAndFrames(p []byte) (*QUICHeader, error) {
 	packetLen, _, err := ReadNextVLI(r)
 	if err != nil {
 		return nil, err
+	}
+	if packetLen < 20 {
+		return nil, errors.New("packet length too short, ignore")
 	}
 
 	// read all remaining bytes as payload
