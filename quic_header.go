@@ -129,6 +129,9 @@ func DecodeQUICHeaderAndFrames(p []byte) (*QUICHeader, error) {
 	}
 
 	// prepare recdata
+	// truncate recdata to remove following (possibly) padding bytes
+	recdata = recdata[:len(recdata)-r.Len()]
+	// remove payload bytes
 	recdata = recdata[:len(recdata)-len(payload)] // recdata: [...headers...] [packet number]
 
 	// decipher packet header byte
