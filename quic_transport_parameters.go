@@ -68,6 +68,12 @@ func ParseQUICTransportParameters(extData []byte) *QUICTransportParameters {
 			return qtp
 		}
 
+		if IsGREASETransportParameter(paramType) {
+			qtp.QTPIDs = append(qtp.QTPIDs, QTP_GREASE) // replace with placeholder
+		} else {
+			qtp.QTPIDs = append(qtp.QTPIDs, paramType)
+		}
+
 		if paramValLen == 0 {
 			continue // skip empty transport parameter, no need to try to read
 		}
@@ -130,11 +136,11 @@ func ParseQUICTransportParameters(extData []byte) *QUICTransportParameters {
 			unsetVLIBits(qtp.ActiveConnectionIDLimit)
 		}
 
-		if IsGREASETransportParameter(paramType) {
-			qtp.QTPIDs = append(qtp.QTPIDs, QTP_GREASE) // replace with placeholder
-		} else {
-			qtp.QTPIDs = append(qtp.QTPIDs, paramType)
-		}
+		// if IsGREASETransportParameter(paramType) {
+		// 	qtp.QTPIDs = append(qtp.QTPIDs, QTP_GREASE) // replace with placeholder
+		// } else {
+		// 	qtp.QTPIDs = append(qtp.QTPIDs, paramType)
+		// }
 	}
 
 	// sort QTPIDs
