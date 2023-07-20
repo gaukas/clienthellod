@@ -27,6 +27,14 @@ func ParseQUICClientHello(p []byte) (*QUICClientHello, error) {
 		return nil, err
 	}
 
+	if ch.qtp == nil {
+		return nil, ErrNotQUICInitialPacket
+	}
+
+	if ch.qtp.ParseError() != nil {
+		return nil, ch.qtp.ParseError()
+	}
+
 	return &QUICClientHello{ClientHello: *ch}, nil
 }
 

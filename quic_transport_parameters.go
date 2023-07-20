@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/gaukas/clienthellod/internal/utils"
@@ -58,15 +59,23 @@ func ParseQUICTransportParameters(extData []byte) *QUICTransportParameters {
 	for r.Len() > 0 {
 		paramType, _, qtp.parseError = ReadNextVLI(r)
 		if qtp.parseError != nil {
+			qtp.parseError = fmt.Errorf("failed to read transport parameter type: %w", qtp.parseError)
 			return qtp
 		}
 		paramValLen, _, qtp.parseError = ReadNextVLI(r)
 		if qtp.parseError != nil {
+			qtp.parseError = fmt.Errorf("failed to read transport parameter value length: %w", qtp.parseError)
 			return qtp
 		}
+
+		if paramValLen == 0 {
+			continue // skip empty transport parameter, no need to try to read
+		}
+
 		paramData = make([]byte, paramValLen)
 		n, qtp.parseError = r.Read(paramData)
 		if qtp.parseError != nil {
+			qtp.parseError = fmt.Errorf("failed to read transport parameter value: %w", qtp.parseError)
 			return qtp
 		}
 		if uint64(n) != paramValLen {
