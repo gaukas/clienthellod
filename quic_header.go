@@ -11,6 +11,11 @@ import (
 	"golang.org/x/crypto/cryptobyte"
 )
 
+const (
+	TOKEN_ABSENT  uint32 = 0x00000000
+	TOKEN_PRESENT uint32 = 0x00000001
+)
+
 var (
 	ErrNotQUICLongHeaderFormat = errors.New("packet is not in QUIC Long Header Format")
 	ErrNotQUICInitialPacket    = errors.New("packet is not a QUIC Initial Packet")
@@ -30,7 +35,7 @@ type QUICHeader struct {
 	FrameIDs utils.Uint8Arr `json:"frame_id,omitempty"` // sorted
 	frames   []Frame
 
-	TokenLength uint32 `json:"token_len,omitempty"`
+	Token bool `json:"token,omitempty"`
 
 	HexID     string `json:"hdrid,omitempty"`
 	NumericID uint64 `json:"hdrnid,omitempty"`
@@ -85,16 +90,17 @@ func DecodeQUICHeaderAndFrames(p []byte) (*QUICHeader, error) {
 	if err != nil {
 		return nil, err
 	}
-	qHdr.TokenLength = uint32(tokenLen)
-
 	// read token bytes
-	token := make([]byte, qHdr.TokenLength)
+	token := make([]byte, tokenLen)
 	n, err := r.Read(token)
 	if err != nil {
 		return nil, err
 	}
 	if n != int(tokenLen) {
 		return nil, errors.New("failed to read all token bytes, short read")
+	}
+	if tokenLen > 0 {
+		qHdr.Token = true
 	}
 
 	// packet length is a VLI
@@ -188,7 +194,11 @@ func (qHdr *QUICHeader) NID() uint64 {
 	updateU32(h, qHdr.SCIDLength)
 	updateArr(h, qHdr.PacketNumber)
 	updateArr(h, qHdr.FrameIDs)
-	updateU32(h, qHdr.TokenLength)
+	if qHdr.Token {
+		updateU32(h, TOKEN_PRESENT)
+	} else {
+		updateU32(h, TOKEN_ABSENT)
+	}
 
 	qHdr.NumericID = binary.BigEndian.Uint64(h.Sum(nil)[0:8])
 	return qHdr.NumericID

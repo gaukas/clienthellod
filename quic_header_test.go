@@ -55,8 +55,8 @@ func testcaseDecodeQUICHeaderAndFrames(t *testing.T, data []byte, truth *QUICHea
 		t.Errorf("qHdr.FrameIDs = %v, want %v", qHdr.FrameIDs, truth.FrameIDs)
 	}
 
-	if qHdr.TokenLength != truth.TokenLength {
-		t.Errorf("qHdr.TokenLength = %d, want %d", qHdr.TokenLength, truth.TokenLength)
+	if qHdr.Token != truth.Token {
+		t.Errorf("qHdr.Token = %t, want %t", qHdr.Token, truth.Token)
 	}
 }
 
@@ -226,7 +226,7 @@ var (
 		FrameIDs: []byte{
 			0x00, 0x01, 0x06, // sorted unique IDs
 		},
-		TokenLength: 0,
+		Token: false,
 	}
 
 	quicIETFData_MozillaFirefox = []byte{
@@ -411,6 +411,6 @@ var (
 		FrameIDs: []byte{
 			0x06, // sorted unique IDs
 		},
-		TokenLength: 86,
+		Token: true,
 	}
 )
