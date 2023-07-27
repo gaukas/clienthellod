@@ -72,5 +72,5 @@ func unsetVLIBits(vli []byte) {
 }
 
 func IsGREASETransportParameter(paramType uint64) bool {
-	return (paramType-27)%31 == 0 // reserved values are 27, 58, 89, ...
+	return paramType >= 27 && (paramType-27)%31 == 0 // reserved values are 27, 58, 89, ...
 }
