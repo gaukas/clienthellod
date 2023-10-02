@@ -62,7 +62,7 @@ func (lw *ListenerWrapper) Provision(ctx caddy.Context) error { // skipcq: GO-W1
 	lw.logger.Info("clienthellod listener logger loaded.")
 
 	// reservoir
-	if !ctx.AppIsConfigured(app.CaddyAppID) {
+	if ctx.AppIfConfigured(app.CaddyAppID) == nil {
 		return errors.New("clienthellod listener: global reservoir is not configured")
 	}
 	a, err := ctx.App(app.CaddyAppID)
