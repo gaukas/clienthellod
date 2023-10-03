@@ -50,15 +50,12 @@ func (h *Handler) Provision(ctx caddy.Context) error { // skipcq: GO-W1029
 	h.logger = ctx.Logger(h)
 	h.logger.Info("clienthellod handler logger loaded.")
 
-	if !ctx.AppIsConfigured(app.CaddyAppID) {
+	if a := ctx.AppIfConfigured(app.CaddyAppID); a == nil {
 		return errors.New("clienthellod handler: global reservoir is not configured")
+	} else {
+		h.reservoir = a.(*app.Reservoir)
+		h.logger.Info("clienthellod handler reservoir loaded.")
 	}
-	a, err := ctx.App(app.CaddyAppID)
-	if err != nil {
-		return err
-	}
-	h.reservoir = a.(*app.Reservoir)
-	h.logger.Info("clienthellod handler reservoir loaded.")
 
 	if h.TLS && h.QUIC {
 		return errors.New("clienthellod handler: mutually exclusive TLS and QUIC are both enabled")

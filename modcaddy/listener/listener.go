@@ -62,16 +62,14 @@ func (lw *ListenerWrapper) Provision(ctx caddy.Context) error { // skipcq: GO-W1
 	lw.logger.Info("clienthellod listener logger loaded.")
 
 	// reservoir
-	if !ctx.AppIsConfigured(app.CaddyAppID) {
+	if a := ctx.AppIfConfigured(app.CaddyAppID); a == nil {
 		return errors.New("clienthellod listener: global reservoir is not configured")
+	} else {
+		lw.reservoir = a.(*app.Reservoir)
+		lw.logger.Info("clienthellod listener reservoir loaded.")
 	}
-	a, err := ctx.App(app.CaddyAppID)
-	if err != nil {
-		return err
-	}
-	lw.reservoir = a.(*app.Reservoir)
-	lw.logger.Info("clienthellod listener reservoir loaded.")
 
+	var err error
 	// UDP listener if enabled and not already provisioned
 	if lw.UDP && lw.udpListener == nil {
 		lw.udpListener, err = net.ListenIP("ip4:udp", &net.IPAddr{})
