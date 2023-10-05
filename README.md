@@ -2,6 +2,7 @@
 ![Go Build Status](https://github.com/gaukas/clienthellod/actions/workflows/go.yml/badge.svg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gaukas/clienthellod)](https://goreportcard.com/report/github.com/gaukas/clienthellod)
 [![DeepSource](https://app.deepsource.com/gh/gaukas/clienthellod.svg/?label=active+issues&show_trend=true&token=GugDSBnYAxAF25QNpfyAO5d2)](https://app.deepsource.com/gh/gaukas/clienthellod/)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgaukas%2Fclienthellod.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgaukas%2Fclienthellod?ref=badge_shield&issueType=license)
 
 ClientHello Parser/Resolver as a Service from [tlsfingerprint.io](https://tlsfingerprint.io).
 
