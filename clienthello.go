@@ -106,6 +106,21 @@ func (ch *ClientHello) ParseClientHello() error {
 	ch.CipherSuites = chs.CipherSuites
 	ch.CompressionMethods = chs.CompressionMethods
 
+	// parse extensions
+	ch.parseExtensions(chs)
+
+	// Call uTLS to parse the raw bytes into ClientHelloMsg
+	chm := tls.UnmarshalClientHello(ch.raw[5:])
+	if chm == nil {
+		return errors.New("failed to parse ClientHello, (*tls.ClientHelloInfo).Unmarshal(): nil")
+	}
+	ch.ServerName = chm.ServerName
+
+	// In the end parse extra information from raw
+	return ch.parseExtra()
+}
+
+func (ch *ClientHello) parseExtensions(chs *tls.ClientHelloSpec) {
 	for _, ext := range chs.Extensions {
 		switch ext := ext.(type) {
 		case *tls.SupportedCurvesExtension:
@@ -159,16 +174,6 @@ func (ch *ClientHello) ParseClientHello() error {
 			}
 		}
 	}
-
-	// Call uTLS to parse the raw bytes into ClientHelloMsg
-	chm := tls.UnmarshalClientHello(ch.raw[5:])
-	if chm == nil {
-		return errors.New("failed to parse ClientHello, (*tls.ClientHelloInfo).Unmarshal(): nil")
-	}
-	ch.ServerName = chm.ServerName
-
-	// In the end parse extra information from raw
-	return ch.parseExtra()
 }
 
 // parseExtra parses extra information from raw bytes which couldn't be parsed by uTLS.
@@ -213,6 +218,22 @@ func (ch *ClientHello) parseExtra() error {
 		return errors.New("unable to read extensions data")
 	}
 
+	err := ch.parseExtensionsExtra(extensions)
+	if err != nil {
+		return fmt.Errorf("failed to parse extensions, parseExtensionsExtra(): %w", err)
+	}
+
+	// sort ch.Extensions and put result to ch.ExtensionsNormalized
+	ch.ExtensionsNormalized = make([]uint16, len(ch.Extensions))
+	copy(ch.ExtensionsNormalized, ch.Extensions)
+	sort.Slice(ch.ExtensionsNormalized, func(i, j int) bool {
+		return ch.ExtensionsNormalized[i] < ch.ExtensionsNormalized[j]
+	})
+
+	return nil
+}
+
+func (ch *ClientHello) parseExtensionsExtra(extensions cryptobyte.String) error {
 	var extensionIDs []uint16
 	for !extensions.Empty() {
 		var extensionID uint16
@@ -256,13 +277,6 @@ func (ch *ClientHello) parseExtra() error {
 		extensionIDs = append(extensionIDs, extensionID)
 	}
 	ch.Extensions = extensionIDs
-
-	// sort ch.Extensions and put result to ch.ExtensionsNormalized
-	ch.ExtensionsNormalized = make([]uint16, len(ch.Extensions))
-	copy(ch.ExtensionsNormalized, ch.Extensions)
-	sort.Slice(ch.ExtensionsNormalized, func(i, j int) bool {
-		return ch.ExtensionsNormalized[i] < ch.ExtensionsNormalized[j]
-	})
 
 	return nil
 }
