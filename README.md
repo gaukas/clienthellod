@@ -148,3 +148,8 @@ A sample Caddyfile is provided below.
 }
 ```
 
+## License
+
+This project is developed and distributed under Apache-2.0 license. 
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgaukas%2Fclienthellod.svg?type=large&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgaukas%2Fclienthellod?ref=badge_large&issueType=license)
