@@ -245,40 +245,48 @@ func (ch *ClientHello) parseExtensionsExtra(extensions cryptobyte.String) error 
 			return errors.New("unable to read extension data")
 		}
 
-		switch extensionID {
-		case 16: // ALPN
-			ch.alpnWithLengths = extensionData
-		case 51: // keyshare
-			if !extensionData.Skip(2) {
-				return errors.New("unable to skip keyshare total length")
-			}
-			for !extensionData.Empty() {
-				var group uint16
-				var length uint16
-				if !extensionData.ReadUint16(&group) || !extensionData.ReadUint16(&length) {
-					return errors.New("unable to read keyshare group")
-				}
-				if utils.IsGREASEUint16(group) {
-					group = tls.GREASE_PLACEHOLDER
-				}
-				ch.keyshareGroupsWithLengths = append(ch.keyshareGroupsWithLengths, group)
-				ch.keyshareGroupsWithLengths = append(ch.keyshareGroupsWithLengths, length)
-
-				if !extensionData.Skip(int(length)) {
-					return errors.New("unable to skip keyshare data")
-				}
-			}
-		default:
-			if utils.IsGREASEUint16(extensionID) {
-				extensionIDs = append(extensionIDs, tls.GREASE_PLACEHOLDER)
-				continue
-			}
+		extensionID, err := ch.parseExtensionExtra(extensionID, extensionData)
+		if err != nil {
+			return fmt.Errorf("failed to parse extension, parseExtensionExtra(): %w", err)
 		}
-		extensionIDs = append(extensionIDs, extensionID)
+		extensionIDs = append(extensionIDs, extensionID) // extension ID might need to be overridden by parseExtensionExtra() in case of GREASE
 	}
 	ch.Extensions = extensionIDs
 
 	return nil
+}
+
+func (ch *ClientHello) parseExtensionExtra(extensionID uint16, extensionData cryptobyte.String) (uint16, error) {
+	switch extensionID {
+	case 16: // ALPN
+		ch.alpnWithLengths = extensionData
+	case 51: // keyshare
+		if !extensionData.Skip(2) {
+			return 0, errors.New("unable to skip keyshare total length")
+		}
+		for !extensionData.Empty() {
+			var group uint16
+			var length uint16
+			if !extensionData.ReadUint16(&group) || !extensionData.ReadUint16(&length) {
+				return 0, errors.New("unable to read keyshare group")
+			}
+			if utils.IsGREASEUint16(group) {
+				group = tls.GREASE_PLACEHOLDER
+			}
+			ch.keyshareGroupsWithLengths = append(ch.keyshareGroupsWithLengths, group)
+			ch.keyshareGroupsWithLengths = append(ch.keyshareGroupsWithLengths, length)
+
+			if !extensionData.Skip(int(length)) {
+				return 0, errors.New("unable to skip keyshare data")
+			}
+		}
+	default:
+		if utils.IsGREASEUint16(extensionID) {
+			return tls.GREASE_PLACEHOLDER, nil
+		}
+	}
+
+	return extensionID, nil
 }
 
 // FingerprintNID calculates fingerprint Numerical ID of ClientHello.
