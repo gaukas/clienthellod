@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gaukas/godicttls"
+	"github.com/refraction-networking/utls/dicttls"
 )
 
 var (
@@ -38,20 +38,20 @@ var (
 		// MaxAckDelay:                          []byte{}, // nil
 		// ActiveConnectionIDLimit:              []byte{}, // nil
 		QTPIDs: []uint64{
-			godicttls.QUICTransportParameter_max_idle_timeout,
-			godicttls.QUICTransportParameter_max_udp_payload_size,
-			godicttls.QUICTransportParameter_initial_max_data,
-			godicttls.QUICTransportParameter_initial_max_stream_data_bidi_local,
-			godicttls.QUICTransportParameter_initial_max_stream_data_bidi_remote,
-			godicttls.QUICTransportParameter_initial_max_stream_data_uni,
-			godicttls.QUICTransportParameter_initial_max_streams_bidi,
-			godicttls.QUICTransportParameter_initial_max_streams_uni,
-			godicttls.QUICTransportParameter_initial_source_connection_id,
+			dicttls.QUICTransportParameter_max_idle_timeout,
+			dicttls.QUICTransportParameter_max_udp_payload_size,
+			dicttls.QUICTransportParameter_initial_max_data,
+			dicttls.QUICTransportParameter_initial_max_stream_data_bidi_local,
+			dicttls.QUICTransportParameter_initial_max_stream_data_bidi_remote,
+			dicttls.QUICTransportParameter_initial_max_stream_data_uni,
+			dicttls.QUICTransportParameter_initial_max_streams_bidi,
+			dicttls.QUICTransportParameter_initial_max_streams_uni,
+			dicttls.QUICTransportParameter_initial_source_connection_id,
 			QTP_GREASE,
-			godicttls.QUICTransportParameter_max_datagram_frame_size,
-			godicttls.QUICTransportParameter_google_connection_options,
-			godicttls.QUICTransportParameter_google_version,
-			0xff73db, // godicttls.QUICTransportParameter_version_information,
+			dicttls.QUICTransportParameter_max_datagram_frame_size,
+			dicttls.QUICTransportParameter_google_connection_options,
+			dicttls.QUICTransportParameter_google_version,
+			0xff73db, // dicttls.QUICTransportParameter_version_information,
 		},
 	}
 )

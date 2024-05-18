@@ -10,8 +10,8 @@ import (
 	"sort"
 
 	"github.com/gaukas/clienthellod/internal/utils"
-	"github.com/gaukas/godicttls"
 	tls "github.com/refraction-networking/utls"
+	"github.com/refraction-networking/utls/dicttls"
 	"golang.org/x/crypto/cryptobyte"
 )
 
@@ -169,7 +169,7 @@ func (ch *ClientHello) parseExtensions(chs *tls.ClientHelloSpec) {
 		case *tls.ApplicationSettingsExtension:
 			ch.ApplicationSettings = ext.SupportedProtocols
 		case *tls.GenericExtension:
-			if ext.Id == godicttls.ExtType_quic_transport_parameters {
+			if ext.Id == dicttls.ExtType_quic_transport_parameters {
 				ch.qtp = ParseQUICTransportParameters(ext.Data)
 			}
 		}
