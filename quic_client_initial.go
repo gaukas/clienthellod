@@ -15,10 +15,10 @@ import (
 // skipcq: GSC-G505
 
 type ClientInitial struct {
-	Header *QUICHeader `json:"header,omitempty"` // QUIC header
-	Frames []uint64    `json:"frames,omitempty"` // frames ID in order
-	frames QUICFrames  // frames in order
-	raw    []byte
+	Header     *QUICHeader `json:"header,omitempty"` // QUIC header
+	FrameTypes []uint64    `json:"frames,omitempty"` // frames ID in order
+	frames     QUICFrames  // frames in order
+	raw        []byte
 }
 
 // UnmarshalQUICClientInitialPacket is similar to ParseQUICCIP, but on error
@@ -34,7 +34,7 @@ func UnmarshalQUICClientInitialPacket(p []byte) (ci *ClientInitial, err error) {
 		return
 	}
 
-	ci.Frames = ci.frames.FrameTypes()
+	ci.FrameTypes = ci.frames.FrameTypes()
 
 	// reassembledCRYPTOFrame, err := ReassembleCRYPTOFrames(cip.Header.Frames())
 	// if err != nil {
