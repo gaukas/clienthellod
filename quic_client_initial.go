@@ -79,8 +79,9 @@ type GatheredClientInitials struct {
 	HexID string `json:"hex_id,omitempty"`
 	NumID uint64 `json:"num_id,omitempty"`
 
-	expiringCtx context.Context
-	completed   atomic.Bool
+	expiringCtx       context.Context
+	cancelExpiringCtx context.CancelFunc
+	completed         atomic.Bool
 }
 
 // GatherClientInitialPackets reads a series of Client Initial Packets from the input channel
@@ -91,12 +92,13 @@ func GatherClientInitials() *GatheredClientInitials {
 		pktsMutex:                &sync.Mutex{},
 		clientHelloReconstructor: NewQUICClientHelloReconstructor(),
 		expiringCtx:              context.Background(), // by default, never expire
+		cancelExpiringCtx:        func() {},
 	}
 }
 
 func GatherClientInitialsUntil(expiry time.Time) *GatheredClientInitials {
 	gci := GatherClientInitials()
-	gci.expiringCtx, _ = context.WithDeadline(context.Background(), expiry)
+	gci.expiringCtx, gci.cancelExpiringCtx = context.WithDeadline(context.Background(), expiry)
 	return gci
 }
 
@@ -156,6 +158,9 @@ func (gci *GatheredClientInitials) lockedGatherComplete() error {
 	numericID := gci.calcNumericID()
 	atomic.StoreUint64(&gci.NumID, numericID)
 	gci.HexID = FingerprintID(numericID).AsHex()
+
+	// cancel the expiry context if any
+	gci.cancelExpiringCtx()
 
 	// Finally, mark the completion
 	gci.completed.Store(true)
