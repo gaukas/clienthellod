@@ -20,12 +20,12 @@ var mapGatheredClientInitials = map[string][][]byte{
 func TestGatherClientInitials(t *testing.T) {
 	for name, test := range mapGatheredClientInitials {
 		t.Run(name, func(t *testing.T) {
-			testGatherClientInitials(t, test)
+			testGatherClientInitialsWithRawPayload(t, test)
 		})
 	}
 }
 
-func testGatherClientInitials(t *testing.T, data [][]byte) {
+func testGatherClientInitialsWithRawPayload(t *testing.T, data [][]byte) {
 	until := time.Now().Add(1 * time.Second) // must be gathered within 1 second
 
 	ci := GatherClientInitialsUntil(until)
