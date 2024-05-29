@@ -1,11 +1,14 @@
 package clienthellod
 
-import "bytes"
+import (
+	"bytes"
+)
 
 type QUICClientHello struct {
 	ClientHello
 }
 
+// ParseQUICClientHello parses a QUIC ClientHello from a QUIC Initial Packet.
 func ParseQUICClientHello(p []byte) (*QUICClientHello, error) {
 	// patch TLS record header to make it a valid TLS record
 	record := make([]byte, 5+len(p))

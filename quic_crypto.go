@@ -11,6 +11,14 @@ import (
 )
 
 func ClientInitialKeysCalc(initialRandom []byte) (clientKey, clientIV, clientHpKey []byte, err error) {
+	clientKey, clientIV, clientHpKey, err = clientInitialKeysCalc(initialRandom)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return
+}
+
+func clientInitialKeysCalc(initialRandom []byte) (clientKey, clientIV, clientHpKey []byte, err error) {
 	initialSalt := []byte{
 		0x38, 0x76, 0x2c, 0xf7,
 		0xf5, 0x59, 0x34, 0xb3,

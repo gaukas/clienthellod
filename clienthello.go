@@ -1,9 +1,7 @@
 package clienthellod
 
 import (
-	"crypto/sha1" // skipcq: GSC-G505
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -40,10 +38,10 @@ type ClientHello struct {
 
 	UserAgent string `json:"user_agent,omitempty"` // User-Agent header, set by the caller
 
-	NID     int64  `json:"nid,omitempty"`      // NID of the fingerprint
-	NormNID int64  `json:"norm_nid,omitempty"` // Normalized NID of the fingerprint
-	ID      string `json:"id,omitempty"`       // ID of the fingerprint (hex string)
-	NormID  string `json:"norm_id,omitempty"`  // Normalized ID of the fingerprint (hex string)
+	NumID     int64  `json:"num_id,omitempty"`      // NID of the fingerprint
+	NormNumID int64  `json:"norm_num_id,omitempty"` // Normalized NID of the fingerprint
+	HexID     string `json:"hex_id,omitempty"`      // ID of the fingerprint (hex string)
+	NormHexID string `json:"norm_hex_id,omitempty"` // Normalized ID of the fingerprint (hex string)
 
 	// below are ONLY used for calculating the fingerprint (hash)
 	lengthPrefixedSupportedGroups   []uint16
@@ -230,6 +228,11 @@ func (ch *ClientHello) parseExtra() error {
 		return ch.ExtensionsNormalized[i] < ch.ExtensionsNormalized[j]
 	})
 
+	// calculate fingerprint
+	ch.NumID, ch.NormNumID = ch.calcNumericID()
+	ch.HexID = FingerprintID(ch.NumID).AsHex()
+	ch.NormHexID = FingerprintID(ch.NormNumID).AsHex()
+
 	return nil
 }
 
@@ -287,65 +290,4 @@ func (ch *ClientHello) parseExtensionExtra(extensionID uint16, extensionData cry
 	}
 
 	return extensionID, nil
-}
-
-// FingerprintNID calculates fingerprint Numerical ID of ClientHello.
-// Fingerprint is defined by
-func (ch *ClientHello) FingerprintNID(normalized bool) int64 {
-	if normalized && ch.NormNID != 0 {
-		return ch.NormNID
-	}
-
-	if !normalized && ch.NID != 0 {
-		return ch.NID
-	}
-
-	h := sha1.New() // skipcq: GO-S1025, GSC-G401,
-	binary.Write(h, binary.BigEndian, uint16(ch.TLSRecordVersion))
-	binary.Write(h, binary.BigEndian, uint16(ch.TLSHandshakeVersion))
-
-	updateArr(h, utils.Uint16ToUint8(ch.CipherSuites))
-	updateArr(h, ch.CompressionMethods)
-	if normalized {
-		updateArr(h, utils.Uint16ToUint8(ch.ExtensionsNormalized))
-	} else {
-		updateArr(h, utils.Uint16ToUint8(ch.Extensions))
-	}
-	updateArr(h, utils.Uint16ToUint8(ch.lengthPrefixedSupportedGroups))
-	updateArr(h, ch.lengthPrefixedEcPointFormats)
-	updateArr(h, utils.Uint16ToUint8(ch.lengthPrefixedSignatureAlgos))
-	updateArr(h, ch.alpnWithLengths)
-	updateArr(h, utils.Uint16ToUint8(ch.keyshareGroupsWithLengths))
-	updateArr(h, ch.PSKKeyExchangeModes)
-	updateArr(h, utils.Uint16ToUint8(ch.SupportedVersions))
-	updateArr(h, ch.lengthPrefixedCertCompressAlgos)
-	updateArr(h, ch.RecordSizeLimit)
-
-	out := int64(binary.BigEndian.Uint64(h.Sum(nil)[:8]))
-
-	if normalized {
-		// ch.norm_nid = out
-		ch.NormNID = out
-	} else {
-		// ch._nid = out
-		ch.NID = out
-	}
-
-	return out
-}
-
-// FingerprintID calculates fingerprint ID of ClientHello and
-// represents it as hexadecimal string.
-func (ch *ClientHello) FingerprintID(normalized bool) string {
-	nid := ch.FingerprintNID(normalized)
-	hid := make([]byte, 8)
-	binary.BigEndian.PutUint64(hid, uint64(nid))
-
-	id := hex.EncodeToString(hid)
-	if normalized {
-		ch.NormID = id
-	} else {
-		ch.ID = id
-	}
-	return id
 }

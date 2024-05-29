@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha1" // skipcq: GSC-G505
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"sort"
@@ -34,10 +33,10 @@ type QUICTransportParameters struct {
 	MaxAckDelay                    utils.Uint8Arr `json:"max_ack_delay,omitempty"`
 
 	ActiveConnectionIDLimit utils.Uint8Arr `json:"active_connection_id_limit,omitempty"`
-	QTPIDs                  []uint64       `json:"qtpid,omitempty"` // sorted
+	QTPIDs                  []uint64       `json:"tpids,omitempty"` // sorted
 
-	HexID     string `json:"tpfpid,omitempty"`
-	NumericID uint64 `json:"tpfnid,omitempty"`
+	HexID string `json:"hex_id,omitempty"`
+	NumID uint64 `json:"num_id,omitempty"`
 
 	parseError error
 }
@@ -149,6 +148,8 @@ func ParseQUICTransportParameters(extData []byte) *QUICTransportParameters {
 	})
 
 	qtp.parseError = nil
+	qtp.NumID = qtp.calcNumericID()
+	qtp.HexID = FingerprintID(qtp.NumID).AsHex()
 	return qtp
 }
 
@@ -158,11 +159,7 @@ func (qtp *QUICTransportParameters) ParseError() error {
 }
 
 // NID returns the numeric ID of this transport parameters combination.
-func (qtp *QUICTransportParameters) NID() uint64 {
-	if qtp.NumericID != 0 {
-		return qtp.NumericID
-	}
-
+func (qtp *QUICTransportParameters) calcNumericID() uint64 {
 	h := sha1.New() // skipcq: GO-S1025, GSC-G401
 	updateArr(h, qtp.MaxIdleTimeout)
 	updateArr(h, qtp.MaxUDPPayloadSize)
@@ -181,16 +178,5 @@ func (qtp *QUICTransportParameters) NID() uint64 {
 		updateU64(h, id)
 	}
 
-	qtp.NumericID = binary.BigEndian.Uint64(h.Sum(nil))
-	return qtp.NumericID
-}
-
-// HID returns the hex ID of this transport parameters combination.
-func (qtp *QUICTransportParameters) HID() string {
-	nid := qtp.NID()
-	hid := make([]byte, 8)
-	binary.BigEndian.PutUint64(hid, nid)
-
-	qtp.HexID = hex.EncodeToString(hid)
-	return qtp.HexID
+	return binary.BigEndian.Uint64(h.Sum(nil))
 }
