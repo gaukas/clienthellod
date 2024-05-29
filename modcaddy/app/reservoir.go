@@ -47,8 +47,8 @@ func (Reservoir) CaddyModule() caddy.ModuleInfo { // skipcq: GO-W1029
 		ID: CaddyAppID,
 		New: func() caddy.Module {
 			reservoir := &Reservoir{
-				ValidFor:      caddy.Duration(DEFAULT_RESERVOIR_ENTRY_VALID_FOR),
-				CleanInterval: caddy.Duration(DEFAULT_RESERVOIR_CLEANING_INTERVAL),
+				ValidFor: caddy.Duration(DEFAULT_RESERVOIR_ENTRY_VALID_FOR),
+				// CleanInterval: caddy.Duration(DEFAULT_RESERVOIR_CLEANING_INTERVAL),
 			}
 
 			return reservoir
@@ -69,15 +69,14 @@ func (r *Reservoir) QUICFingerprinter() *clienthellod.QUICFingerprinter { // ski
 // Start implements Start() of caddy.App.
 func (r *Reservoir) Start() error { // skipcq: GO-W1029
 	if r.ValidFor <= 0 {
-		return errors.New("valid_for must be a positive duration")
+		return errors.New("validfor must be a positive duration")
 	}
 
-	if r.CleanInterval <= 0 {
-		return errors.New("clean_interval must be a positive duration")
-	}
+	// if r.CleanInterval <= 0 {
+	// 	return errors.New("clean_interval must be a positive duration")
+	// }
 
-	r.tlsFingerprinter = clienthellod.NewTLSFingerprinterWithTimeout(time.Duration(r.ValidFor))
-	r.quicFingerprinter = clienthellod.NewQUICFingerprinterWithTimeout(time.Duration(r.ValidFor))
+	r.logger.Info("clienthellod reservoir is started")
 
 	return nil
 }
@@ -92,6 +91,9 @@ func (r *Reservoir) Stop() error { // skipcq: GO-W1029
 // Provision implements Provision() of caddy.Provisioner.
 func (r *Reservoir) Provision(ctx caddy.Context) error { // skipcq: GO-W1029
 	r.logger = ctx.Logger(r)
+	r.tlsFingerprinter = clienthellod.NewTLSFingerprinterWithTimeout(time.Duration(r.ValidFor))
+	r.quicFingerprinter = clienthellod.NewQUICFingerprinterWithTimeout(time.Duration(r.ValidFor))
+
 	r.logger.Info("clienthellod reservoir is provisioned")
 	return nil
 }

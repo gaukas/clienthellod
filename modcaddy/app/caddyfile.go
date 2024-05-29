@@ -23,8 +23,8 @@ as the first argument (validfor).
 */
 func parseCaddyfile(d *caddyfile.Dispenser, _ interface{}) (interface{}, error) {
 	app := &Reservoir{
-		ValidFor:      caddy.Duration(DEFAULT_RESERVOIR_ENTRY_VALID_FOR),
-		CleanInterval: caddy.Duration(DEFAULT_RESERVOIR_CLEANING_INTERVAL),
+		ValidFor: caddy.Duration(DEFAULT_RESERVOIR_ENTRY_VALID_FOR),
+		// CleanInterval: caddy.Duration(DEFAULT_RESERVOIR_CLEANING_INTERVAL),
 	}
 
 	for d.Next() {
@@ -43,15 +43,16 @@ func parseCaddyfile(d *caddyfile.Dispenser, _ interface{}) (interface{}, error) 
 					return nil, d.Errf("invalid duration: %v", err)
 				}
 				app.ValidFor = caddy.Duration(duration)
-				app.CleanInterval = caddy.Duration(duration)
-				// second argument is optional (clean interval)
-				if len(args) == 2 {
-					duration, err := caddy.ParseDuration(args[1])
-					if err != nil {
-						return nil, d.Errf("invalid duration: %v", err)
-					}
-					app.CleanInterval = caddy.Duration(duration)
-				}
+				// app.CleanInterval = caddy.Duration(duration)
+
+				// second argument is deprecated (clean interval)
+				// if len(args) == 2 {
+				// 	duration, err := caddy.ParseDuration(args[1])
+				// 	if err != nil {
+				// 		return nil, d.Errf("invalid duration: %v", err)
+				// 	}
+				// 	app.CleanInterval = caddy.Duration(duration)
+				// }
 				if len(args) > 2 {
 					return nil, d.Err("too many arguments")
 				}
