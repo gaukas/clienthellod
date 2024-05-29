@@ -57,12 +57,12 @@ func (Reservoir) CaddyModule() caddy.ModuleInfo { // skipcq: GO-W1029
 }
 
 // TLSFingerprinter returns the TLSFingerprinter instance.
-func (r *Reservoir) TLSFingerprinter() *clienthellod.TLSFingerprinter {
+func (r *Reservoir) TLSFingerprinter() *clienthellod.TLSFingerprinter { // skipcq: GO-W1029
 	return r.tlsFingerprinter
 }
 
 // QUICFingerprinter returns the QUICFingerprinter instance.
-func (r *Reservoir) QUICFingerprinter() *clienthellod.QUICFingerprinter {
+func (r *Reservoir) QUICFingerprinter() *clienthellod.QUICFingerprinter { // skipcq: GO-W1029
 	return r.quicFingerprinter
 }
 
