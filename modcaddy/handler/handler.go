@@ -18,7 +18,10 @@ func init() {
 	caddy.RegisterModule(Handler{})
 	httpcaddyfile.RegisterHandlerDirective("clienthellod", func(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
 		m := &Handler{}
-		return m, m.UnmarshalCaddyfile(h.Dispenser)
+		if err := m.UnmarshalCaddyfile(h.Dispenser); err != nil {
+			return nil, err
+		}
+		return m, nil
 	})
 }
 
