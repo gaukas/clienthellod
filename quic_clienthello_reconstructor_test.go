@@ -53,7 +53,7 @@ func TestQUICClientHelloReconstructor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	} else {
-		rand.New(rand.NewSource(randInt64.Int64())).Shuffle(len(Chrome124_CRYPTO), func(i, j int) {
+		rand.New(rand.NewSource(randInt64.Int64())).Shuffle(len(Chrome124_CRYPTO), func(i, j int) { // skipcq: GSC-G404
 			Chrome124_CRYPTO[i], Chrome124_CRYPTO[j] = Chrome124_CRYPTO[j], Chrome124_CRYPTO[i]
 		})
 	}
