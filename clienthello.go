@@ -138,7 +138,7 @@ func (ch *ClientHello) ParseClientHello() error {
 	return ch.parseExtra()
 }
 
-func (ch *ClientHello) parseExtensions(chs *tls.ClientHelloSpec) {
+func (ch *ClientHello) parseExtensions(chs *tls.ClientHelloSpec) { // skipcq: GO-R1005
 	for _, ext := range chs.Extensions {
 		switch ext := ext.(type) {
 		case *tls.SupportedCurvesExtension:

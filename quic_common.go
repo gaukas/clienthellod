@@ -83,7 +83,7 @@ var (
 )
 
 // DecodeQUICHeaderAndFrames decodes a QUIC initial packet and returns a QUICHeader.
-func DecodeQUICHeaderAndFrames(p []byte) (hdr *QUICHeader, frames QUICFrames, err error) {
+func DecodeQUICHeaderAndFrames(p []byte) (hdr *QUICHeader, frames QUICFrames, err error) { // skipcq: GO-R1005
 	if len(p) < 7 { // at least 7 bytes before TokenLength
 		return nil, nil, errors.New("packet too short")
 	}

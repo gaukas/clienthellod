@@ -13,7 +13,7 @@ func TestParseQUICClientHello(t *testing.T) {
 	t.Run("Google Chrome", testParseQUICClientHelloGoogleChrome)
 }
 
-func testParseQUICClientHelloGoogleChrome(t *testing.T) {
+func testParseQUICClientHelloGoogleChrome(t *testing.T) { // skipcq: GO-R1005
 	var rawQCH []byte = []byte{
 		0x01, 0x00, 0x01, 0x22, 0x03, 0x03, 0xe3, 0x1b,
 		0x6b, 0x88, 0xce, 0x0e, 0xff, 0x48, 0x08, 0x52,

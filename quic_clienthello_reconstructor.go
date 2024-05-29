@@ -37,7 +37,7 @@ const (
 // By default, all fragments are saved into an internal map as a pending
 // fragment, UNLESS all fragments before it have been reassembled.
 // If the fragment is the last one, it will return io.EOF.
-func (qchr *QUICClientHelloReconstructor) AddCRYPTOFragment(offset uint64, frag []byte) error {
+func (qchr *QUICClientHelloReconstructor) AddCRYPTOFragment(offset uint64, frag []byte) error { // skipcq: GO-R1005
 	// Check for duplicate. The new fragment should not be a duplicate
 	// of any pending-reassemble fragments.
 	if _, ok := qchr.frags[offset]; ok {
