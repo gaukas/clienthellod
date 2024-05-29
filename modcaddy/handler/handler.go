@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/caddyserver/caddy/v2"
@@ -76,8 +77,13 @@ func (h *Handler) ServeHTTP(wr http.ResponseWriter, req *http.Request, next cadd
 
 	if h.TLS && req.ProtoMajor <= 2 { // HTTP/1.0, HTTP/1.1, H2
 		return h.serveHTTP12(wr, req, next) // TLS ClientHello capture enabled, serve ClientHello
-	} else if h.QUIC && req.ProtoMajor == 3 { // QUIC
-		return h.serveQUIC(wr, req, next)
+	} else if h.QUIC {
+		if req.ProtoMajor == 3 { // QUIC
+			return h.serveQUIC(wr, req, next)
+		} else {
+			h.logger.Debug("Serving QUIC Fingerprint over TLS")
+			return h.serveQUICFingerprintOverTLS(wr, req, next)
+		}
 	}
 	return next.ServeHTTP(wr, req)
 }
@@ -142,7 +148,64 @@ func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next cadd
 
 	h.logger.Debug(fmt.Sprintf("Extracted QUIC fingerprint for %s", req.RemoteAddr))
 
+	// Get IP part of the RemoteAddr
+	ip, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err == nil {
+		h.reservoir.NewQUICVisitor(ip, req.RemoteAddr)
+	} else {
+		h.logger.Error(fmt.Sprintf("Can't extract IP from %s: %v", req.RemoteAddr, err))
+	}
+
 	qfp.UserAgent = req.UserAgent()
+
+	// dump JSON
+	var b []byte
+	if req.URL.Query().Get("beautify") == "true" {
+		b, err = json.MarshalIndent(qfp, "", "  ")
+	} else {
+		b, err = json.Marshal(qfp)
+	}
+	if err != nil {
+		h.logger.Error("failed to marshal QUIC fingerprint into JSON", zap.Error(err))
+		return next.ServeHTTP(wr, req)
+	}
+
+	// write JSON to response
+	wr.Header().Set("Content-Type", "application/json")
+	wr.Header().Set("Connection", "close")
+	_, err = wr.Write(b)
+	if err != nil {
+		h.logger.Error("failed to write response", zap.Error(err))
+		return next.ServeHTTP(wr, req)
+	}
+	return nil
+}
+
+func (h *Handler) serveQUICFingerprintOverTLS(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
+	// Get IP part of the RemoteAddr
+	ip, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		h.logger.Error(fmt.Sprintf("Can't extract IP from %s: %v", req.RemoteAddr, err))
+		return next.ServeHTTP(wr, req)
+	}
+
+	// Get the last QUIC visitor
+	fullKey, ok := h.reservoir.GetLastQUICVisitor(ip)
+	if !ok {
+		h.logger.Debug(fmt.Sprintf("Can't find last QUIC visitor for %s", ip))
+		return next.ServeHTTP(wr, req)
+	}
+
+	// Get the client hello from the reservoir
+	// get the client hello from the reservoir
+	qfp, err := h.reservoir.QUICFingerprinter().LookupAwait(fullKey)
+	if err != nil {
+		h.logger.Error(fmt.Sprintf("Can't extract QUIC fingerprint sent by %s: %v", ip, err))
+		return next.ServeHTTP(wr, req)
+	}
+
+	h.logger.Debug(fmt.Sprintf("Extracted QUIC fingerprint for %s", fullKey))
+	// qfp.UserAgent = req.UserAgent() // Should have been updated
 
 	// dump JSON
 	var b []byte

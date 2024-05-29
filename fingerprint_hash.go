@@ -76,7 +76,7 @@ func (gci *GatheredClientInitials) calcNumericID() uint64 {
 	// merge, deduplicate, and sort all frames from all packets
 	var allFrameIDs []uint8
 	for _, p := range gci.Packets {
-		allFrameIDs = append(allFrameIDs, p.Frames.FrameTypesUint8()...)
+		allFrameIDs = append(allFrameIDs, p.frames.FrameTypesUint8()...)
 	}
 	dedupAllFrameIDs := utils.DedupIntArr(allFrameIDs)
 	sort.Slice(dedupAllFrameIDs, func(i, j int) bool {

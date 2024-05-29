@@ -3,8 +3,10 @@ package clienthellod
 import (
 	"crypto/sha1" // skipcq: GSC-G505
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -35,7 +37,7 @@ func GenerateQUICFingerprint(gci *GatheredClientInitials) (*QUICFingerprint, err
 	// TODO: calculate hash
 	h := sha1.New() // skipcq: GO-S1025, GSC-G401
 	updateU64(h, gci.NumID)
-	updateU64(h, uint64(gci.ClientHello.NumID))
+	updateU64(h, uint64(gci.ClientHello.NormNumID))
 	updateU64(h, gci.TransportParameters.NumID)
 
 	qfp.NumID = binary.BigEndian.Uint64(h.Sum(nil))
@@ -84,6 +86,11 @@ func (qfp *QUICFingerprinter) HandlePacket(from string, p []byte) error {
 		}
 		return err
 	}
+	b, err := json.Marshal(ci)
+	if err != nil {
+		return err
+	}
+	log.Printf("ClientInitial: %s", string(b))
 
 	var testGci *GatheredClientInitials
 	if qfp.timeout == time.Duration(0) {
@@ -102,6 +109,7 @@ func (qfp *QUICFingerprinter) HandlePacket(from string, p []byte) error {
 				<-time.After(qfp.timeout)
 			}
 			qfp.mapGatheringClientInitials.Delete(from)
+			log.Printf("GatheredClientInitials for %s expired", from)
 		}()
 	}
 
@@ -161,7 +169,7 @@ func (qfp *QUICFingerprinter) HandleIPConn(ipc *net.IPConn) error {
 }
 
 func (qfp *QUICFingerprinter) Lookup(from string) *QUICFingerprint {
-	gci, ok := qfp.mapGatheringClientInitials.LoadAndDelete(from)
+	gci, ok := qfp.mapGatheringClientInitials.Load(from) // when using LoadAndDelete, some implementations "wasting" QUIC connections will fail
 	if !ok {
 		return nil
 	}
@@ -184,7 +192,7 @@ func (qfp *QUICFingerprinter) Lookup(from string) *QUICFingerprint {
 }
 
 func (qfp *QUICFingerprinter) LookupAwait(from string) (*QUICFingerprint, error) {
-	gci, ok := qfp.mapGatheringClientInitials.LoadAndDelete(from)
+	gci, ok := qfp.mapGatheringClientInitials.Load(from) // when using LoadAndDelete, some implementations "wasting" QUIC connections will fail
 	if !ok {
 		return nil, errors.New("GatheredClientInitials not found for the given key")
 	}
@@ -193,6 +201,12 @@ func (qfp *QUICFingerprinter) LookupAwait(from string) (*QUICFingerprint, error)
 	if !ok {
 		return nil, errors.New("GatheredClientInitials loaded from sync.Map failed type assertion")
 	}
+
+	b, err := json.Marshal(gatheredCI)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("Found GatheredClientInitials: %s", string(b))
 
 	qf, err := GenerateQUICFingerprint(gatheredCI)
 	if err != nil {

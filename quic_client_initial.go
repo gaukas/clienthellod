@@ -2,8 +2,10 @@ package clienthellod
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -14,7 +16,8 @@ import (
 
 type ClientInitial struct {
 	Header *QUICHeader `json:"header,omitempty"` // QUIC header
-	Frames QUICFrames  `json:"frames,omitempty"` // frames in order
+	Frames []uint64    `json:"frames,omitempty"` // frames ID in order
+	frames QUICFrames  // frames in order
 	raw    []byte
 }
 
@@ -26,10 +29,12 @@ func UnmarshalQUICClientInitialPacket(p []byte) (ci *ClientInitial, err error) {
 		raw: p,
 	}
 
-	ci.Header, ci.Frames, err = DecodeQUICHeaderAndFrames(p)
+	ci.Header, ci.frames, err = DecodeQUICHeaderAndFrames(p)
 	if err != nil {
 		return
 	}
+
+	ci.Frames = ci.frames.FrameTypes()
 
 	// reassembledCRYPTOFrame, err := ReassembleCRYPTOFrames(cip.Header.Frames())
 	// if err != nil {
@@ -128,7 +133,7 @@ func (gci *GatheredClientInitials) AddPacket(cip *ClientInitial) error {
 		return gci.Packets[i].Header.initialPacketNumber < gci.Packets[j].Header.initialPacketNumber
 	})
 
-	if err := gci.clientHelloReconstructor.FromFrames(cip.Frames); err != nil {
+	if err := gci.clientHelloReconstructor.FromFrames(cip.frames); err != nil {
 		if errors.Is(err, ErrNeedMoreFrames) {
 			return nil // abort early, need more frames before ClientHello can be reconstructed
 		} else {
@@ -164,6 +169,12 @@ func (gci *GatheredClientInitials) lockedGatherComplete() error {
 
 	// Finally, mark the completion
 	gci.completed.Store(true)
+
+	b, err := json.Marshal(gci)
+	if err != nil {
+		return err
+	}
+	log.Printf("GatheredClientInitials: %s", string(b))
 
 	return nil
 }

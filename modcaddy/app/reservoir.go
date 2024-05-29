@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/caddyserver/caddy/v2"
@@ -34,8 +35,9 @@ type Reservoir struct {
 	// sufficient.
 	CleanInterval caddy.Duration `json:"clean_interval,omitempty"`
 
-	tlsFingerprinter  *clienthellod.TLSFingerprinter
-	quicFingerprinter *clienthellod.QUICFingerprinter
+	tlsFingerprinter        *clienthellod.TLSFingerprinter
+	quicFingerprinter       *clienthellod.QUICFingerprinter
+	mapLastQUICVisitorPerIP *sync.Map // sometimes even when a complete QUIC handshake is done, client decide to connect using HTTP/2
 
 	logger *zap.Logger
 }
@@ -66,6 +68,26 @@ func (r *Reservoir) QUICFingerprinter() *clienthellod.QUICFingerprinter { // ski
 	return r.quicFingerprinter
 }
 
+// NewQUICVisitor updates the map entry for the given IP address.
+func (r *Reservoir) NewQUICVisitor(ip, fullKey string) { // skipcq: GO-W1029
+	r.mapLastQUICVisitorPerIP.Store(ip, fullKey)
+
+	// delete it after validfor if not updated
+	time.AfterFunc(time.Duration(r.ValidFor), func() {
+		r.mapLastQUICVisitorPerIP.CompareAndDelete(ip, fullKey)
+	})
+}
+
+// GetLastQUICVisitor returns the last QUIC visitor for the given IP address.
+func (r *Reservoir) GetLastQUICVisitor(ip string) (string, bool) { // skipcq: GO-W1029
+	if v, ok := r.mapLastQUICVisitorPerIP.Load(ip); ok {
+		if fullKey, ok := v.(string); ok {
+			return fullKey, true
+		}
+	}
+	return "", false
+}
+
 // Start implements Start() of caddy.App.
 func (r *Reservoir) Start() error { // skipcq: GO-W1029
 	if r.ValidFor <= 0 {
@@ -93,6 +115,7 @@ func (r *Reservoir) Provision(ctx caddy.Context) error { // skipcq: GO-W1029
 	r.logger = ctx.Logger(r)
 	r.tlsFingerprinter = clienthellod.NewTLSFingerprinterWithTimeout(time.Duration(r.ValidFor))
 	r.quicFingerprinter = clienthellod.NewQUICFingerprinterWithTimeout(time.Duration(r.ValidFor))
+	r.mapLastQUICVisitorPerIP = new(sync.Map)
 
 	r.logger.Info("clienthellod reservoir is provisioned")
 	return nil

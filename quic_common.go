@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/gaukas/clienthellod/internal/utils"
 	"golang.org/x/crypto/cryptobyte"
 )
 
@@ -110,7 +111,8 @@ func DecodeQUICHeaderAndFrames(p []byte) (hdr *QUICHeader, frames QUICFrames, er
 
 	// LSB of the first byte is protected, we will resolve it later
 
-	hdr.Version = p[1:5]
+	hdr.Version = make(utils.Uint8Arr, 4)
+	copy(hdr.Version, p[1:5])
 	s := cryptobyte.String(p[5:])
 	initialRandom := new(cryptobyte.String)
 	if !s.ReadUint8LengthPrefixed(initialRandom) {
