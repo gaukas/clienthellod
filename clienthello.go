@@ -296,8 +296,7 @@ func (ch *ClientHello) parseExtensionExtra(extensionID uint16, extensionData cry
 			if utils.IsGREASEUint16(group) {
 				group = tls.GREASE_PLACEHOLDER
 			}
-			ch.keyshareGroupsWithLengths = append(ch.keyshareGroupsWithLengths, group)
-			ch.keyshareGroupsWithLengths = append(ch.keyshareGroupsWithLengths, length)
+			ch.keyshareGroupsWithLengths = append(ch.keyshareGroupsWithLengths, group, length)
 
 			if !extensionData.Skip(int(length)) {
 				return 0, errors.New("unable to skip keyshare data")

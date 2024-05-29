@@ -62,9 +62,8 @@ func TestQUICClientHelloReconstructor(t *testing.T) {
 		if err := r.AddCRYPTOFragment(frag.offset, frag.pl); err != nil {
 			if i == len(Chrome124_CRYPTO)-1 && errors.Is(err, io.EOF) {
 				break
-			} else {
-				t.Fatal(err)
 			}
+			t.Fatal(err)
 		}
 	}
 
