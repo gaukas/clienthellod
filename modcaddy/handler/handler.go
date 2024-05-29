@@ -83,33 +83,34 @@ func (h *Handler) ServeHTTP(wr http.ResponseWriter, req *http.Request, next cadd
 // ClientHello from the reservoir and writing it to the response.
 func (h *Handler) serveHTTP12(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
 	// get the client hello from the reservoir
-	ch := h.reservoir.WithdrawClientHello(req.RemoteAddr)
+	ch := h.reservoir.TLSFingerprinter().Lookup(req.RemoteAddr)
 	if ch == nil {
-		h.logger.Debug(fmt.Sprintf("Can't withdraw client hello from %s, is it not a TLS connection?", req.RemoteAddr))
+		h.logger.Debug(fmt.Sprintf("Can't extract TLS ClientHello sent by %s, maybe not TLS connection?", req.RemoteAddr))
 		return next.ServeHTTP(wr, req)
 	}
-	h.logger.Debug(fmt.Sprintf("Withdrew client hello from %s", req.RemoteAddr))
+	h.logger.Debug(fmt.Sprintf("Extracted TLS ClientHello for %s", req.RemoteAddr))
 
-	err := ch.ParseClientHello()
-	if err != nil {
-		h.logger.Error("failed to parse client hello", zap.Error(err))
-		return next.ServeHTTP(wr, req)
-	}
+	// err := ch.ParseClientHello()
+	// if err != nil {
+	// 	h.logger.Error("failed to parse client hello", zap.Error(err))
+	// 	return next.ServeHTTP(wr, req)
+	// }
 
-	h.logger.Debug("ClientHello ID: " + ch.FingerprintID(false))
-	h.logger.Debug("ClientHello NormID: " + ch.FingerprintID(true))
+	h.logger.Debug("ClientHello ID: " + ch.HexID)
+	h.logger.Debug("ClientHello NormID: " + ch.NormHexID)
 	h.logger.Debug("User-Agent: " + req.UserAgent())
 	ch.UserAgent = req.UserAgent()
 
 	// dump JSON
 	var b []byte
+	var err error
 	if req.URL.Query().Get("beautify") == "true" {
 		b, err = json.MarshalIndent(ch, "", "  ")
 	} else {
 		b, err = json.Marshal(ch)
 	}
 	if err != nil {
-		h.logger.Error("failed to marshal client hello", zap.Error(err))
+		h.logger.Error("failed to marshal TLS ClientHello into JSON", zap.Error(err))
 		return next.ServeHTTP(wr, req)
 	}
 
@@ -130,25 +131,25 @@ func (h *Handler) serveHTTP12(wr http.ResponseWriter, req *http.Request, next ca
 // reservoir and writing it to the response.
 func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
 	// get the client hello from the reservoir
-	cip := h.reservoir.WithdrawQUICCIP(req.RemoteAddr)
-	if cip == nil {
-		h.logger.Debug(fmt.Sprintf("Can't withdraw QUIC client hello from %s, is it not a QUIC connection?", req.RemoteAddr))
+	qfp, err := h.reservoir.QUICFingerprinter().LookupAwait(req.RemoteAddr)
+	if err != nil {
+		h.logger.Error(fmt.Sprintf("Can't extract QUIC fingerprint sent by %s: %v", req.RemoteAddr, err))
 		return next.ServeHTTP(wr, req)
 	}
-	h.logger.Debug(fmt.Sprintf("Withdrew QUIC client hello from %s", req.RemoteAddr))
 
-	cip.UserAgent = req.UserAgent()
+	h.logger.Debug(fmt.Sprintf("Extracted QUIC fingerprint for %s", req.RemoteAddr))
+
+	qfp.UserAgent = req.UserAgent()
 
 	// dump JSON
 	var b []byte
-	var err error
 	if req.URL.Query().Get("beautify") == "true" {
-		b, err = json.MarshalIndent(cip, "", "  ")
+		b, err = json.MarshalIndent(qfp, "", "  ")
 	} else {
-		b, err = json.Marshal(cip)
+		b, err = json.Marshal(qfp)
 	}
 	if err != nil {
-		h.logger.Error("failed to marshal QUIC client hello", zap.Error(err))
+		h.logger.Error("failed to marshal QUIC fingerprint into JSON", zap.Error(err))
 		return next.ServeHTTP(wr, req)
 	}
 

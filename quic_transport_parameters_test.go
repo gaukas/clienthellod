@@ -1,14 +1,16 @@
-package clienthellod
+package clienthellod_test
 
 import (
 	"reflect"
 	"testing"
 
+	. "github.com/gaukas/clienthellod"
+
 	"github.com/refraction-networking/utls/dicttls"
 )
 
 var (
-	rawQTPExtDataGoogleChrome = []byte{
+	rawQTPExtData_Chrome120 = []byte{
 		0x09, 0x02, 0x40, 0x67, // initial_max_streams_uni
 		0x0f, 0x00, // initial_source_connection_id
 		0x01, 0x04, 0x80, 0x00, 0x75, 0x30, // max_idle_timeout
@@ -25,7 +27,7 @@ var (
 		0x04, 0x04, 0x80, 0xf0, 0x00, 0x00, // initial_max_data
 	}
 
-	expectedQTPGoogleChrome *QUICTransportParameters = &QUICTransportParameters{
+	qtpTruth_Chrome120 *QUICTransportParameters = &QUICTransportParameters{
 		MaxIdleTimeout:                 []byte{0x00, 0x00, 0x75, 0x30},
 		MaxUDPPayloadSize:              []byte{0x05, 0xc0},
 		InitialMaxData:                 []byte{0x00, 0xf0, 0x00, 0x00},
@@ -53,6 +55,9 @@ var (
 			dicttls.QUICTransportParameter_google_version,
 			0xff73db, // dicttls.QUICTransportParameter_version_information,
 		},
+
+		HexID: "89bffb37428ff651",
+		NumID: 9925928318506366545,
 	}
 )
 
@@ -61,18 +66,18 @@ func TestParseQUICTransportParameters(t *testing.T) {
 }
 
 func parseQUICTransportParametersGoogleChrome(t *testing.T) {
-	qtp := ParseQUICTransportParameters(rawQTPExtDataGoogleChrome)
+	qtp := ParseQUICTransportParameters(rawQTPExtData_Chrome120)
 	if qtp == nil {
 		t.Errorf("ParseQUICTransportParameters failed: got nil")
 		return
 	}
 
-	if qtp.parseError != nil {
-		t.Errorf("ParseQUICTransportParameters failed: %v", qtp.parseError)
+	if qtp.ParseError() != nil {
+		t.Errorf("ParseQUICTransportParameters failed: %v", qtp.ParseError())
 		return
 	}
 
-	if !reflect.DeepEqual(qtp, expectedQTPGoogleChrome) {
-		t.Errorf("ParseQUICTransportParameters failed: expected %v, got %v", expectedQTPGoogleChrome, qtp)
+	if !reflect.DeepEqual(qtp, qtpTruth_Chrome120) {
+		t.Errorf("ParseQUICTransportParameters failed: expected %v, got %v", qtpTruth_Chrome120, qtp)
 	}
 }

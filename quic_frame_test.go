@@ -1,9 +1,11 @@
-package clienthellod
+package clienthellod_test
 
 import (
 	"bytes"
 	"math/rand"
 	"testing"
+
+	. "github.com/gaukas/clienthellod"
 )
 
 func TestPADDING(t *testing.T) {
@@ -71,8 +73,8 @@ func TestCRYPTO(t *testing.T) {
 		0xa0, 0x60, 0x79, 0x1c, 0x45, 0xa5, 0xb8, 0x43,
 		0x58, 0x11,
 	}
-	if !bytes.Equal(crypto.Data, cryptoDataTruth) {
-		t.Errorf("crypto.Data = %v, want %v", crypto.Data, cryptoDataTruth)
+	if !bytes.Equal(crypto.Data(), cryptoDataTruth) {
+		t.Errorf("crypto.Data = %v, want %v", crypto.Data(), cryptoDataTruth)
 	}
 
 	// check what's left in the Reader
@@ -354,3 +356,59 @@ var (
 		0x01, 0x01, 0x01, 0x01, 0x01,
 	}
 )
+
+var (
+	quicFramesTruth_Chrome125_PKN1 = QUICFrames{
+		&CRYPTO{Offset: 0, Length: 1211},
+	}
+	quicFramesTruth_Chrome125_PKN2 = QUICFrames{
+		&CRYPTO{Offset: 1211, Length: 8},
+		&PADDING{Length: 80},
+		&CRYPTO{Offset: 1720, Length: 35},
+		&CRYPTO{Offset: 1677, Length: 43},
+		&PADDING{Length: 2},
+		&PING{},
+		&PADDING{Length: 235},
+		&CRYPTO{Offset: 1755, Length: 21},
+		&CRYPTO{Offset: 1219, Length: 238},
+		&PADDING{Length: 305},
+		&CRYPTO{Offset: 1457, Length: 220},
+		&PING{},
+	}
+	quicFramesTruth_Firefox126 = QUICFrames{
+		&CRYPTO{Offset: 0, Length: 633},
+	}
+)
+
+func testQUICFramesEqualsTruth(t *testing.T, frames, truths QUICFrames) {
+	if len(frames) != len(truths) {
+		t.Fatalf("Expected %d frames, got %d", len(truths), len(frames))
+	}
+
+	for i, truth := range truths {
+		switch truth := truth.(type) {
+		case *CRYPTO:
+			if frame, ok := frames[i].(*CRYPTO); ok {
+				if frame.Offset != truth.Offset || frame.Length != truth.Length {
+					t.Errorf("Frame %d: expected %+v, got %+v", i, truth, frame)
+				}
+			} else {
+				t.Errorf("Frame %d: expected CRYPTO, got %T", i, frames[i])
+			}
+		case *PADDING:
+			if frame, ok := frames[i].(*PADDING); ok {
+				if frame.Length != truth.Length {
+					t.Errorf("Frame %d: expected %+v, got %+v", i, truth, frame)
+				}
+			} else {
+				t.Errorf("Frame %d: expected PADDING, got %T", i, frames[i])
+			}
+		case *PING:
+			if _, ok := frames[i].(*PING); !ok {
+				t.Errorf("Frame %d: expected PING, got %T", i, frames[i])
+			}
+		default:
+			t.Fatalf("Unknown frame type: %T", truth)
+		}
+	}
+}

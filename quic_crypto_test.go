@@ -1,9 +1,11 @@
-package clienthellod
+package clienthellod_test
 
 import (
 	"bytes"
 	"encoding/hex"
 	"testing"
+
+	. "github.com/gaukas/clienthellod"
 )
 
 func TestClientInitialKeysCalc(t *testing.T) {

@@ -1,11 +1,12 @@
-package clienthellod
+package clienthellod_test
 
 import (
 	"bytes"
-	"reflect"
 	"testing"
 
 	"golang.org/x/exp/slices"
+
+	. "github.com/gaukas/clienthellod"
 )
 
 func TestParseQUICClientHello(t *testing.T) {
@@ -144,9 +145,5 @@ func testParseQUICClientHelloGoogleChrome(t *testing.T) {
 		qch.ApplicationSettings,
 		[]string{"h3"}) {
 		t.Fatalf("application settings does not match, expecting [\"h3\"], got %v", qch.ApplicationSettings)
-	}
-
-	if !reflect.DeepEqual(qch.qtp, expectedQTPGoogleChrome) {
-		t.Errorf("ParseQUICTransportParameters failed: expected %v, got %v", expectedQTPGoogleChrome, qch.qtp)
 	}
 }

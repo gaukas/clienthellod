@@ -1,6 +1,7 @@
 package clienthellod
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -62,7 +63,10 @@ type ClientHello struct {
 //
 // It will return an error if the reader does not give a stream of bytes
 // representing a valid ClientHello. But all bytes read from the reader
-// will be stored in the ClientHello struct to be rewinded by the caller.
+// will be stored in the ClientHello struct to be rewinded by the caller
+// if ever needed.
+//
+// This function does not automatically call [ClientHello.ParseClientHello].
 func ReadClientHello(r io.Reader) (ch *ClientHello, err error) {
 	ch = new(ClientHello)
 	// Read a TLS record
@@ -81,6 +85,22 @@ func ReadClientHello(r io.Reader) (ch *ClientHello, err error) {
 	// Read exactly length bytes from the reader
 	ch.raw = append(ch.raw, make([]byte, binary.BigEndian.Uint16(ch.raw[3:5]))...)
 	_, err = io.ReadFull(r, ch.raw[5:])
+	return
+}
+
+// UnmarshalClientHello unmarshals a ClientHello from a byte slice
+// and returns a ClientHello struct. Any extra bytes after the ClientHello
+// message will be ignored.
+//
+// This function automatically calls [ClientHello.ParseClientHello].
+func UnmarshalClientHello(p []byte) (ch *ClientHello, err error) {
+	r := bytes.NewReader(p)
+	ch, err = ReadClientHello(r)
+	if err != nil {
+		return
+	}
+
+	err = ch.ParseClientHello()
 	return
 }
 

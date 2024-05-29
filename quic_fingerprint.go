@@ -22,14 +22,14 @@ type QUICFingerprint struct {
 	UserAgent string `json:"user_agent,omitempty"` // User-Agent header, set by the caller
 }
 
-func GenerateQUICFingerprint(gci *GatheredClientInitials, userAgent string) (*QUICFingerprint, error) {
+func GenerateQUICFingerprint(gci *GatheredClientInitials) (*QUICFingerprint, error) {
 	if err := gci.Wait(); err != nil {
 		return nil, err // GatheringClientInitials failed (expired before complete)
 	}
 
 	qfp := &QUICFingerprint{
 		ClientInitials: gci,
-		UserAgent:      userAgent,
+		// UserAgent:      userAgent,
 	}
 
 	// TODO: calculate hash
@@ -43,6 +43,8 @@ func GenerateQUICFingerprint(gci *GatheredClientInitials, userAgent string) (*QU
 
 	return qfp, nil
 }
+
+const DEFAULT_QUICFINGERPRINT_EXPIRY = 10 * time.Second
 
 type QUICFingerprinter struct {
 	mapGatheringClientInitials *sync.Map
@@ -58,7 +60,23 @@ func NewQUICFingerprinter() *QUICFingerprinter {
 	}
 }
 
-func (fgp *QUICFingerprinter) HandlePacket(from string, p []byte) error {
+func NewQUICFingerprinterWithTimeout(timeout time.Duration) *QUICFingerprinter {
+	return &QUICFingerprinter{
+		mapGatheringClientInitials: new(sync.Map),
+		timeout:                    timeout,
+		closed:                     atomic.Bool{},
+	}
+}
+
+func (qfp *QUICFingerprinter) SetTimeout(timeout time.Duration) {
+	qfp.timeout = timeout
+}
+
+func (qfp *QUICFingerprinter) HandlePacket(from string, p []byte) error {
+	if qfp.closed.Load() {
+		return errors.New("QUICFingerprinter closed")
+	}
+
 	ci, err := UnmarshalQUICClientInitialPacket(p)
 	if err != nil {
 		if errors.Is(err, ErrNotQUICLongHeaderFormat) || errors.Is(err, ErrNotQUICInitialPacket) {
@@ -68,18 +86,22 @@ func (fgp *QUICFingerprinter) HandlePacket(from string, p []byte) error {
 	}
 
 	var testGci *GatheredClientInitials
-	if fgp.timeout == time.Duration(0) {
+	if qfp.timeout == time.Duration(0) {
 		testGci = GatherClientInitials()
 	} else {
-		testGci = GatherClientInitialsUntil(time.Now().Add(fgp.timeout))
+		testGci = GatherClientInitialsUntil(time.Now().Add(qfp.timeout))
 	}
 
-	chosenGci, existing := fgp.mapGatheringClientInitials.LoadOrStore(from, testGci)
+	chosenGci, existing := qfp.mapGatheringClientInitials.LoadOrStore(from, testGci)
 	if !existing {
 		// if we stored the testGci, we need to remember to delete it after the timeout
 		go func() {
-			<-time.After(fgp.timeout)
-			fgp.mapGatheringClientInitials.Delete(from)
+			if qfp.timeout == time.Duration(0) {
+				<-time.After(DEFAULT_QUICFINGERPRINT_EXPIRY)
+			} else {
+				<-time.After(qfp.timeout)
+			}
+			qfp.mapGatheringClientInitials.Delete(from)
 		}()
 	}
 
@@ -91,9 +113,13 @@ func (fgp *QUICFingerprinter) HandlePacket(from string, p []byte) error {
 	return gci.AddPacket(ci)
 }
 
-func (fgp *QUICFingerprinter) HandleUDPConn(pc net.PacketConn) error {
+func (qfp *QUICFingerprinter) HandleUDPConn(pc net.PacketConn) error {
 	var buf [2048]byte
 	for {
+		if qfp.closed.Load() {
+			return errors.New("QUICFingerprinter closed")
+		}
+
 		n, addr, err := pc.ReadFrom(buf[:])
 		if err != nil {
 			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, net.ErrClosed) {
@@ -102,13 +128,17 @@ func (fgp *QUICFingerprinter) HandleUDPConn(pc net.PacketConn) error {
 			continue // ignore errors unless connection is closed
 		}
 
-		fgp.HandlePacket(addr.String(), buf[:n])
+		qfp.HandlePacket(addr.String(), buf[:n])
 	}
 }
 
-func (fgp *QUICFingerprinter) HandleIPConn(ipc *net.IPConn) error {
+func (qfp *QUICFingerprinter) HandleIPConn(ipc *net.IPConn) error {
 	var buf [2048]byte
 	for {
+		if qfp.closed.Load() {
+			return errors.New("QUICFingerprinter closed")
+		}
+
 		n, ipAddr, err := ipc.ReadFromIP(buf[:])
 		if err != nil {
 			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, net.ErrClosed) {
@@ -126,12 +156,12 @@ func (fgp *QUICFingerprinter) HandleIPConn(ipc *net.IPConn) error {
 		}
 		udpAddr := &net.UDPAddr{IP: ipAddr.IP, Port: int(udpPkt.SrcPort)}
 
-		fgp.HandlePacket(udpAddr.String(), udpPkt.Payload)
+		qfp.HandlePacket(udpAddr.String(), udpPkt.Payload)
 	}
 }
 
-func (fgp *QUICFingerprinter) Lookup(from string) *QUICFingerprint {
-	gci, ok := fgp.mapGatheringClientInitials.Load(from)
+func (qfp *QUICFingerprinter) Lookup(from string) *QUICFingerprint {
+	gci, ok := qfp.mapGatheringClientInitials.LoadAndDelete(from)
 	if !ok {
 		return nil
 	}
@@ -142,19 +172,19 @@ func (fgp *QUICFingerprinter) Lookup(from string) *QUICFingerprint {
 	}
 
 	if !gatheredCI.Completed() {
-		return nil
+		return nil // gathering incomplete
 	}
 
-	qfp, err := GenerateQUICFingerprint(gatheredCI, "")
+	qf, err := GenerateQUICFingerprint(gatheredCI)
 	if err != nil {
 		return nil
 	}
 
-	return qfp
+	return qf
 }
 
-func (fgp *QUICFingerprinter) LookupAwait(from string) (*QUICFingerprint, error) {
-	gci, ok := fgp.mapGatheringClientInitials.Load(from)
+func (qfp *QUICFingerprinter) LookupAwait(from string) (*QUICFingerprint, error) {
+	gci, ok := qfp.mapGatheringClientInitials.LoadAndDelete(from)
 	if !ok {
 		return nil, errors.New("GatheredClientInitials not found for the given key")
 	}
@@ -164,10 +194,14 @@ func (fgp *QUICFingerprinter) LookupAwait(from string) (*QUICFingerprint, error)
 		return nil, errors.New("GatheredClientInitials loaded from sync.Map failed type assertion")
 	}
 
-	qfp, err := GenerateQUICFingerprint(gatheredCI, "")
+	qf, err := GenerateQUICFingerprint(gatheredCI)
 	if err != nil {
 		return nil, err
 	}
 
-	return qfp, nil
+	return qf, nil
+}
+
+func (qfp *QUICFingerprinter) Close() {
+	qfp.closed.Store(true)
 }

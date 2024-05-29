@@ -1,8 +1,12 @@
-package clienthellod
+package clienthellod_test
 
 import (
 	"bytes"
 	"testing"
+
+	_ "embed"
+
+	. "github.com/gaukas/clienthellod"
 )
 
 var mapValueToVLI = map[uint64][]byte{
@@ -84,4 +88,62 @@ func TestIsGREASETransportParameter(t *testing.T) {
 			t.Errorf("IsGREASETransportParameter(%v) = %v, want %v", v, !grease, grease)
 		}
 	}
+}
+
+var (
+	//go:embed internal/testdata/QUIC_IETF_Chrome_125_PKN1.bin
+	quicIETFData_Chrome125_PKN1 []byte
+	//go:embed internal/testdata/QUIC_IETF_Chrome_125_PKN2.bin
+	quicIETFData_Chrome125_PKN2 []byte
+
+	//go:embed internal/testdata/QUIC_IETF_Firefox_126.bin
+	quicIETFData_Firefox126 []byte
+)
+
+var mapTestDecodeQUICHeaderAndFrames = map[string]struct {
+	data        []byte
+	headerTruth *QUICHeader
+	framesTruth QUICFrames
+}{
+	"Chrome125_PKN1": {
+		data:        quicIETFData_Chrome125_PKN1,
+		headerTruth: quicHeaderTruth_Chrome125_PKN1,
+		framesTruth: quicFramesTruth_Chrome125_PKN1,
+	},
+	"Chrome125_PKN2": {
+		data:        quicIETFData_Chrome125_PKN2,
+		headerTruth: quicHeaderTruth_Chrome125_PKN2,
+		framesTruth: quicFramesTruth_Chrome125_PKN2,
+	},
+
+	"Firefox126": {
+		data:        quicIETFData_Firefox126,
+		headerTruth: quicHeaderTruth_Firefox126,
+		framesTruth: quicFramesTruth_Firefox126,
+	},
+}
+
+func TestDecodeQUICHeaderAndFrames(t *testing.T) {
+	for name, test := range mapTestDecodeQUICHeaderAndFrames {
+		t.Run(name, func(t *testing.T) {
+			testDecodeQUICHeaderAndFrames(t, test.data, test.headerTruth, test.framesTruth)
+		})
+	}
+}
+
+func testDecodeQUICHeaderAndFrames(t *testing.T, data []byte, headerTruth *QUICHeader, framesTruth QUICFrames) {
+	decodedHeader, decodedFrames, err := DecodeQUICHeaderAndFrames(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("header", func(t *testing.T) {
+		testQUICHeaderEqualsTruth(t, decodedHeader, headerTruth)
+	})
+
+	t.Run("frames", func(t *testing.T) {
+		testQUICFramesEqualsTruth(t, decodedFrames, framesTruth)
+	})
+
+	t.Skip("skipping testing decoded frames")
 }

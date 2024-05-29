@@ -1,9 +1,7 @@
 package clienthellod
 
 import (
-	"bytes"
-	"crypto/sha1" // skipcq: GSC-G505
-	"encoding/binary"
+	"bytes" // skipcq: GSC-G505
 	"errors"
 	"fmt"
 	"sort"
@@ -156,27 +154,4 @@ func ParseQUICTransportParameters(extData []byte) *QUICTransportParameters {
 // ParseError returns the error that occurred during parsing, if any.
 func (qtp *QUICTransportParameters) ParseError() error {
 	return qtp.parseError
-}
-
-// NID returns the numeric ID of this transport parameters combination.
-func (qtp *QUICTransportParameters) calcNumericID() uint64 {
-	h := sha1.New() // skipcq: GO-S1025, GSC-G401
-	updateArr(h, qtp.MaxIdleTimeout)
-	updateArr(h, qtp.MaxUDPPayloadSize)
-	updateArr(h, qtp.InitialMaxData)
-	updateArr(h, qtp.InitialMaxStreamDataBidiLocal)
-	updateArr(h, qtp.InitialMaxStreamDataBidiRemote)
-	updateArr(h, qtp.InitialMaxStreamDataUni)
-	updateArr(h, qtp.InitialMaxStreamsBidi)
-	updateArr(h, qtp.InitialMaxStreamsUni)
-	updateArr(h, qtp.AckDelayExponent)
-	updateArr(h, qtp.MaxAckDelay)
-	updateArr(h, qtp.ActiveConnectionIDLimit)
-
-	updateU32(h, uint32(len(qtp.QTPIDs)))
-	for _, id := range qtp.QTPIDs {
-		updateU64(h, id)
-	}
-
-	return binary.BigEndian.Uint64(h.Sum(nil))
 }

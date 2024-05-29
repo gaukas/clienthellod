@@ -200,6 +200,11 @@ func (f *CRYPTO) ReadReader(r io.Reader) (rr io.Reader, err error) {
 	return r, err
 }
 
+// Data returns a copy of the crypto data.
+func (f *CRYPTO) Data() []byte {
+	return append([]byte{}, f.data...)
+}
+
 // This is an old name reserved for compatibility purpose, it is
 // equivalent to [QUICFrame].
 //

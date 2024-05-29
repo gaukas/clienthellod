@@ -1,14 +1,10 @@
 package app
 
 import (
-	"sync"
-	"time"
-
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
-	"github.com/gaukas/clienthellod"
 )
 
 func init() {
@@ -29,11 +25,6 @@ func parseCaddyfile(d *caddyfile.Dispenser, _ interface{}) (interface{}, error) 
 	app := &Reservoir{
 		ValidFor:      caddy.Duration(DEFAULT_RESERVOIR_ENTRY_VALID_FOR),
 		CleanInterval: caddy.Duration(DEFAULT_RESERVOIR_CLEANING_INTERVAL),
-		chMap: make(map[string]*struct {
-			ch     *clienthellod.ClientHello
-			expiry time.Time
-		}),
-		mutex: new(sync.Mutex),
 	}
 
 	for d.Next() {
