@@ -28,8 +28,10 @@ var (
 	ErrNeedMoreFrames    = errors.New("need more CRYPTO frames")
 )
 
-const maxCRYPTOFragments = 32
-const maxCRYPTOLength = 0x10000 // 10KiB
+const (
+	maxCRYPTOFragments = 32
+	maxCRYPTOLength    = 0x10000 // 10KiB
+)
 
 // AddCRYPTOFragment adds a CRYPTO frame fragment to the reconstructor.
 // By default, all fragments are saved into an internal map as a pending

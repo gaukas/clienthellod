@@ -212,6 +212,8 @@ func (f *CRYPTO) Data() []byte {
 type Frame = QUICFrame
 
 // type guards:
-var _ QUICFrame = (*PADDING)(nil)
-var _ QUICFrame = (*PING)(nil)
-var _ QUICFrame = (*CRYPTO)(nil)
+var (
+	_ QUICFrame = (*PADDING)(nil)
+	_ QUICFrame = (*PING)(nil)
+	_ QUICFrame = (*CRYPTO)(nil)
+)
