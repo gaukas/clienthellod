@@ -193,7 +193,6 @@ func (gci *GatheredClientInitials) Wait() error {
 	case <-gci.completeChan:
 		return nil
 	}
-
 }
 
 func (gci *GatheredClientInitials) Completed() bool {
