@@ -99,6 +99,8 @@ func GatherClientInitials() *GatheredClientInitials {
 		clientHelloReconstructor: NewQUICClientHelloReconstructor(),
 		expiringCtx:              context.Background(), // by default, never expire
 		cancelExpiringCtx:        func() {},
+		completed:                atomic.Bool{},
+		completeChan:             make(chan struct{}),
 	}
 }
 
