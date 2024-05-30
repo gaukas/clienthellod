@@ -87,6 +87,7 @@ type GatheredClientInitials struct {
 	expiringCtx       context.Context
 	cancelExpiringCtx context.CancelFunc
 	completed         atomic.Bool
+	completeChan      chan struct{}
 }
 
 // GatherClientInitialPackets reads a series of Client Initial Packets from the input channel
@@ -169,6 +170,7 @@ func (gci *GatheredClientInitials) lockedGatherComplete() error {
 
 	// Finally, mark the completion
 	gci.completed.Store(true)
+	close(gci.completeChan)
 
 	b, err := json.Marshal(gci)
 	if err != nil {
@@ -185,18 +187,13 @@ func (gci *GatheredClientInitials) Wait() error {
 		return nil
 	}
 
-	for {
-		if gci.completed.Load() {
-			return nil
-		}
-
-		select {
-		case <-gci.expiringCtx.Done():
-			return gci.expiringCtx.Err()
-		default:
-			time.Sleep(1 * time.Millisecond) // TODO: 1ms is far longer than the processing time but far shorter than the RTT, thus a reasonable sleep duration
-		}
+	select {
+	case <-gci.expiringCtx.Done():
+		return gci.expiringCtx.Err()
+	case <-gci.completeChan:
+		return nil
 	}
+
 }
 
 func (gci *GatheredClientInitials) Completed() bool {
