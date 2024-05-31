@@ -73,9 +73,10 @@ func (r *Reservoir) NewQUICVisitor(ip, fullKey string) { // skipcq: GO-W1029
 	r.mapLastQUICVisitorPerIP.Store(ip, fullKey)
 
 	// delete it after validfor if not updated
-	time.AfterFunc(time.Duration(r.ValidFor), func() {
+	go func() {
+		<-time.After(time.Duration(r.ValidFor))
 		r.mapLastQUICVisitorPerIP.CompareAndDelete(ip, fullKey)
-	})
+	}()
 }
 
 // GetLastQUICVisitor returns the last QUIC visitor for the given IP address.
