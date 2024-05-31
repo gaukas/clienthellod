@@ -74,7 +74,6 @@ func (qchr *QUICClientHelloReconstructor) AddCRYPTOFragment(offset uint64, frag 
 	// Check for offset and length: must not be exceeding
 	// the maximum length of a CRYPTO frame.
 	if offset+uint64(len(frag)) > maxCRYPTOLength {
-		// log.Printf("offset too high: %d + %d > %d", offset, len(frag), maxCRYPTOLength)
 		return ErrOffsetTooHigh
 	}
 
@@ -102,15 +101,12 @@ func (qchr *QUICClientHelloReconstructor) AddCRYPTOFragment(offset uint64, frag 
 			}) + 4 // Handshake Type (1) + uint24 Length (3) + ClientHello body
 
 			if qchr.fullLen > maxCRYPTOLength {
-				// log.Printf("offset too high: %d > %d", qchr.fullLen, maxCRYPTOLength)
 				return ErrOffsetTooHigh
 			}
 		}
 	}
 
 	if qchr.fullLen > 0 && uint32(len(qchr.buf)) >= qchr.fullLen { // if we have at least the full length bytes of data, we conclude the CRYPTO frame is complete
-		// log.Printf("fullLen: %d, buf: %d, completed!", qchr.fullLen, len(qchr.buf))
-		// log.Printf("First 4 bytes from buf: %x", qchr.buf[:4])
 		return io.EOF // io.EOF means no more fragments expected
 	}
 

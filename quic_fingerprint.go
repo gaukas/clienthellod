@@ -3,10 +3,8 @@ package clienthellod
 import (
 	"crypto/sha1" // skipcq: GSC-G505
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net"
 	"runtime"
 	"sync"
@@ -91,11 +89,6 @@ func (qfp *QUICFingerprinter) HandlePacket(from string, p []byte) error {
 		}
 		return err
 	}
-	b, err := json.Marshal(ci)
-	if err != nil {
-		return err
-	}
-	log.Printf("ClientInitial: %s", string(b))
 
 	var testGci *GatheredClientInitials
 	if qfp.timeout == time.Duration(0) {
@@ -110,7 +103,6 @@ func (qfp *QUICFingerprinter) HandlePacket(from string, p []byte) error {
 		funcExpiringAfter := func(d time.Duration) {
 			<-time.After(d)
 			qfp.mapGatheringClientInitials.Delete(from)
-			log.Printf("GatheredClientInitials for %s expired", from)
 		}
 
 		if qfp.timeout == time.Duration(0) {
@@ -208,12 +200,6 @@ func (qfp *QUICFingerprinter) LookupAwait(from string) (*QUICFingerprint, error)
 	if !ok {
 		return nil, errors.New("GatheredClientInitials loaded from sync.Map failed type assertion")
 	}
-
-	b, err := json.Marshal(gatheredCI)
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("Found GatheredClientInitials: %s", string(b))
 
 	qf, err := GenerateQUICFingerprint(gatheredCI)
 	if err != nil {
