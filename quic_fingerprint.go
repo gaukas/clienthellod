@@ -101,16 +101,18 @@ func (qfp *QUICFingerprinter) HandlePacket(from string, p []byte) error {
 
 	chosenGci, existing := qfp.mapGatheringClientInitials.LoadOrStore(from, testGci)
 	if !existing {
-		// if we stored the testGci, we need to remember to delete it after the timeout
-		go func() {
-			if qfp.timeout == time.Duration(0) {
-				<-time.After(DEFAULT_QUICFINGERPRINT_EXPIRY)
-			} else {
-				<-time.After(qfp.timeout)
-			}
+		// if we stored the testGci, we need to delete it after the timeout
+		funcExpiringAfter := func(d time.Duration) {
+			<-time.After(d)
 			qfp.mapGatheringClientInitials.Delete(from)
 			log.Printf("GatheredClientInitials for %s expired", from)
-		}()
+		}
+
+		if qfp.timeout == time.Duration(0) {
+			go funcExpiringAfter(DEFAULT_QUICFINGERPRINT_EXPIRY)
+		} else {
+			go funcExpiringAfter(qfp.timeout)
+		}
 	}
 
 	gci, ok := chosenGci.(*GatheredClientInitials)
