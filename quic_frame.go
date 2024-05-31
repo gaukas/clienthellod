@@ -14,7 +14,7 @@ const (
 	QUICFrame_CRYPTO  uint64 = 6 // 6
 )
 
-type Frame interface {
+type QUICFrame interface {
 	// FrameType returns the type of the frame.
 	FrameType() uint64
 
@@ -27,11 +27,11 @@ type Frame interface {
 	ReadReader(io.Reader) (io.Reader, error)
 }
 
-func ReadAllFrames(r io.Reader) ([]Frame, error) {
-	var frames []Frame = make([]Frame, 0)
+func ReadAllFrames(r io.Reader) ([]QUICFrame, error) {
+	var frames []QUICFrame = make([]QUICFrame, 0)
 
 	for {
-		// Frame Type
+		// QUICFrame Type
 		frameType, _, err := ReadNextVLI(r)
 		if err != nil {
 			if err == io.EOF {
@@ -40,8 +40,8 @@ func ReadAllFrames(r io.Reader) ([]Frame, error) {
 			return nil, err
 		}
 
-		// Frame
-		var frame Frame
+		// QUICFrame
+		var frame QUICFrame
 		switch frameType {
 		case QUICFrame_PADDING:
 			frame = &PADDING{}
@@ -64,8 +64,8 @@ func ReadAllFrames(r io.Reader) ([]Frame, error) {
 	}
 }
 
-func ReassembleCRYPTOFrames(frames []Frame) ([]byte, error) {
-	var cryptoFrames []Frame = make([]Frame, 0)
+func ReassembleCRYPTOFrames(frames []QUICFrame) ([]byte, error) {
+	var cryptoFrames []QUICFrame = make([]QUICFrame, 0)
 
 	// Collect all CRYPTO frames
 	for _, frame := range frames {
@@ -87,7 +87,7 @@ func ReassembleCRYPTOFrames(frames []Frame) ([]byte, error) {
 	var reassembled []byte = make([]byte, 0)
 	for _, frame := range cryptoFrames {
 		if uint64(len(reassembled)) == frame.(*CRYPTO).Offset {
-			reassembled = append(reassembled, frame.(*CRYPTO).Data...)
+			reassembled = append(reassembled, frame.(*CRYPTO).data...)
 		} else {
 			return nil, fmt.Errorf("failed to reassemble CRYPTO frames")
 		}
@@ -96,17 +96,39 @@ func ReassembleCRYPTOFrames(frames []Frame) ([]byte, error) {
 	return reassembled, nil
 }
 
+type QUICFrames []QUICFrame
+
+func (qfs QUICFrames) FrameTypes() []uint64 {
+	var frameTypes []uint64 = make([]uint64, 0)
+
+	for _, f := range qfs {
+		frameTypes = append(frameTypes, f.FrameType())
+	}
+
+	return frameTypes
+}
+
+func (qfs QUICFrames) FrameTypesUint8() []uint8 {
+	var frameTypesUint8 []uint8 = make([]uint8, 0)
+
+	for _, f := range qfs {
+		frameTypesUint8 = append(frameTypesUint8, uint8(f.FrameType()&0xFF))
+	}
+
+	return frameTypesUint8
+}
+
 // PADDING frame
 type PADDING struct {
 	Length uint64 `json:"length,omitempty"` // count 0x00 bytes until not 0x00
 }
 
-// FrameType implements Frame interface.
+// FrameType implements QUICFrame interface.
 func (*PADDING) FrameType() uint64 {
 	return QUICFrame_PADDING
 }
 
-// ReadFrom implements Frame interface. It keeps reading until it finds a
+// ReadFrom implements QUICFrame interface. It keeps reading until it finds a
 // non-zero byte, then the non-zero byte is rewinded back to the reader and
 // the reader is returned.
 func (f *PADDING) ReadReader(r io.Reader) (rr io.Reader, err error) {
@@ -133,12 +155,12 @@ func (f *PADDING) ReadReader(r io.Reader) (rr io.Reader, err error) {
 // PING frame
 type PING struct{}
 
-// FrameType implements Frame interface.
+// FrameType implements QUICFrame interface.
 func (*PING) FrameType() uint64 {
 	return QUICFrame_PING
 }
 
-// ReadFrom implements Frame interface. It does nothing and returns the
+// ReadFrom implements QUICFrame interface. It does nothing and returns the
 // input reader.
 func (*PING) ReadReader(r io.Reader) (rr io.Reader, err error) {
 	return r, nil
@@ -148,15 +170,16 @@ func (*PING) ReadReader(r io.Reader) (rr io.Reader, err error) {
 type CRYPTO struct {
 	Offset uint64 `json:"offset,omitempty"` // offset of crypto data, from VLI
 	Length uint64 `json:"length,omitempty"` // length of crypto data, from VLI
-	Data   []byte `json:"data,omitempty"`   // crypto data
+	// DataIn []byte `json:"data,omitempty"`   // TODO: input crypto data, used for unmarshal only
+	data []byte
 }
 
-// FrameType implements Frame interface.
+// FrameType implements QUICFrame interface.
 func (*CRYPTO) FrameType() uint64 {
 	return QUICFrame_CRYPTO
 }
 
-// ReadFrom implements Frame interface. It reads the offset, length and
+// ReadFrom implements QUICFrame interface. It reads the offset, length and
 // crypto data from the input reader.
 func (f *CRYPTO) ReadReader(r io.Reader) (rr io.Reader, err error) {
 	// Offset
@@ -172,7 +195,25 @@ func (f *CRYPTO) ReadReader(r io.Reader) (rr io.Reader, err error) {
 	}
 
 	// Crypto Data
-	f.Data = make([]byte, f.Length)
-	_, err = r.Read(f.Data)
+	f.data = make([]byte, f.Length)
+	_, err = r.Read(f.data)
 	return r, err
 }
+
+// Data returns a copy of the crypto data.
+func (f *CRYPTO) Data() []byte {
+	return append([]byte{}, f.data...)
+}
+
+// This is an old name reserved for compatibility purpose, it is
+// equivalent to [QUICFrame].
+//
+// Deprecated: use the new name [QUICFrame] instead.
+type Frame = QUICFrame
+
+// type guards:
+var (
+	_ QUICFrame = (*PADDING)(nil)
+	_ QUICFrame = (*PING)(nil)
+	_ QUICFrame = (*CRYPTO)(nil)
+)

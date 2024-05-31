@@ -1,14 +1,16 @@
-package clienthellod
+package clienthellod_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/gaukas/godicttls"
+	. "github.com/gaukas/clienthellod"
+
+	"github.com/refraction-networking/utls/dicttls"
 )
 
 var (
-	rawQTPExtDataGoogleChrome = []byte{
+	rawQTPExtData_Chrome120 = []byte{
 		0x09, 0x02, 0x40, 0x67, // initial_max_streams_uni
 		0x0f, 0x00, // initial_source_connection_id
 		0x01, 0x04, 0x80, 0x00, 0x75, 0x30, // max_idle_timeout
@@ -25,7 +27,7 @@ var (
 		0x04, 0x04, 0x80, 0xf0, 0x00, 0x00, // initial_max_data
 	}
 
-	expectedQTPGoogleChrome *QUICTransportParameters = &QUICTransportParameters{
+	qtpTruth_Chrome120 *QUICTransportParameters = &QUICTransportParameters{
 		MaxIdleTimeout:                 []byte{0x00, 0x00, 0x75, 0x30},
 		MaxUDPPayloadSize:              []byte{0x05, 0xc0},
 		InitialMaxData:                 []byte{0x00, 0xf0, 0x00, 0x00},
@@ -38,21 +40,24 @@ var (
 		// MaxAckDelay:                          []byte{}, // nil
 		// ActiveConnectionIDLimit:              []byte{}, // nil
 		QTPIDs: []uint64{
-			godicttls.QUICTransportParameter_max_idle_timeout,
-			godicttls.QUICTransportParameter_max_udp_payload_size,
-			godicttls.QUICTransportParameter_initial_max_data,
-			godicttls.QUICTransportParameter_initial_max_stream_data_bidi_local,
-			godicttls.QUICTransportParameter_initial_max_stream_data_bidi_remote,
-			godicttls.QUICTransportParameter_initial_max_stream_data_uni,
-			godicttls.QUICTransportParameter_initial_max_streams_bidi,
-			godicttls.QUICTransportParameter_initial_max_streams_uni,
-			godicttls.QUICTransportParameter_initial_source_connection_id,
+			dicttls.QUICTransportParameter_max_idle_timeout,
+			dicttls.QUICTransportParameter_max_udp_payload_size,
+			dicttls.QUICTransportParameter_initial_max_data,
+			dicttls.QUICTransportParameter_initial_max_stream_data_bidi_local,
+			dicttls.QUICTransportParameter_initial_max_stream_data_bidi_remote,
+			dicttls.QUICTransportParameter_initial_max_stream_data_uni,
+			dicttls.QUICTransportParameter_initial_max_streams_bidi,
+			dicttls.QUICTransportParameter_initial_max_streams_uni,
+			dicttls.QUICTransportParameter_initial_source_connection_id,
 			QTP_GREASE,
-			godicttls.QUICTransportParameter_max_datagram_frame_size,
-			godicttls.QUICTransportParameter_google_connection_options,
-			godicttls.QUICTransportParameter_google_version,
-			0xff73db, // godicttls.QUICTransportParameter_version_information,
+			dicttls.QUICTransportParameter_max_datagram_frame_size,
+			dicttls.QUICTransportParameter_google_connection_options,
+			dicttls.QUICTransportParameter_google_version,
+			0xff73db, // dicttls.QUICTransportParameter_version_information,
 		},
+
+		HexID: "89bffb37428ff651",
+		NumID: 9925928318506366545,
 	}
 )
 
@@ -61,18 +66,18 @@ func TestParseQUICTransportParameters(t *testing.T) {
 }
 
 func parseQUICTransportParametersGoogleChrome(t *testing.T) {
-	qtp := ParseQUICTransportParameters(rawQTPExtDataGoogleChrome)
+	qtp := ParseQUICTransportParameters(rawQTPExtData_Chrome120)
 	if qtp == nil {
 		t.Errorf("ParseQUICTransportParameters failed: got nil")
 		return
 	}
 
-	if qtp.parseError != nil {
-		t.Errorf("ParseQUICTransportParameters failed: %v", qtp.parseError)
+	if qtp.ParseError() != nil {
+		t.Errorf("ParseQUICTransportParameters failed: %v", qtp.ParseError())
 		return
 	}
 
-	if !reflect.DeepEqual(qtp, expectedQTPGoogleChrome) {
-		t.Errorf("ParseQUICTransportParameters failed: expected %v, got %v", expectedQTPGoogleChrome, qtp)
+	if !reflect.DeepEqual(qtp, qtpTruth_Chrome120) {
+		t.Errorf("ParseQUICTransportParameters failed: expected %v, got %v", qtpTruth_Chrome120, qtp)
 	}
 }

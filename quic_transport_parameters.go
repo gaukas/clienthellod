@@ -1,16 +1,13 @@
 package clienthellod
 
 import (
-	"bytes"
-	"crypto/sha1" // skipcq: GSC-G505
-	"encoding/binary"
-	"encoding/hex"
+	"bytes" // skipcq: GSC-G505
 	"errors"
 	"fmt"
 	"sort"
 
 	"github.com/gaukas/clienthellod/internal/utils"
-	"github.com/gaukas/godicttls"
+	"github.com/refraction-networking/utls/dicttls"
 )
 
 const (
@@ -34,10 +31,10 @@ type QUICTransportParameters struct {
 	MaxAckDelay                    utils.Uint8Arr `json:"max_ack_delay,omitempty"`
 
 	ActiveConnectionIDLimit utils.Uint8Arr `json:"active_connection_id_limit,omitempty"`
-	QTPIDs                  []uint64       `json:"qtpid,omitempty"` // sorted
+	QTPIDs                  []uint64       `json:"tpids,omitempty"` // sorted
 
-	HexID     string `json:"tpfpid,omitempty"`
-	NumericID uint64 `json:"tpfnid,omitempty"`
+	HexID string `json:"hex_id,omitempty"`
+	NumID uint64 `json:"num_id,omitempty"`
 
 	parseError error
 }
@@ -90,47 +87,47 @@ func ParseQUICTransportParameters(extData []byte) *QUICTransportParameters {
 		}
 
 		switch paramType {
-		case godicttls.QUICTransportParameter_max_idle_timeout:
+		case dicttls.QUICTransportParameter_max_idle_timeout:
 			// qtp.MaxIdleTimeoutLength = uint32(paramValLen)
 			qtp.MaxIdleTimeout = paramData
 			unsetVLIBits(qtp.MaxIdleTimeout) // toggle the UNSET_VLI_BITS flag to control behavior
-		case godicttls.QUICTransportParameter_max_udp_payload_size:
+		case dicttls.QUICTransportParameter_max_udp_payload_size:
 			// qtp.MaxUDPPayloadSizeLength = uint32(paramValLen)
 			qtp.MaxUDPPayloadSize = paramData
 			unsetVLIBits(qtp.MaxUDPPayloadSize)
-		case godicttls.QUICTransportParameter_initial_max_data:
+		case dicttls.QUICTransportParameter_initial_max_data:
 			// qtp.InitialMaxDataLength = uint32(paramValLen)
 			qtp.InitialMaxData = paramData
 			unsetVLIBits(qtp.InitialMaxData)
-		case godicttls.QUICTransportParameter_initial_max_stream_data_bidi_local:
+		case dicttls.QUICTransportParameter_initial_max_stream_data_bidi_local:
 			// qtp.InitialMaxStreamDataBidiLocalLength = uint32(paramValLen)
 			qtp.InitialMaxStreamDataBidiLocal = paramData
 			unsetVLIBits(qtp.InitialMaxStreamDataBidiLocal)
-		case godicttls.QUICTransportParameter_initial_max_stream_data_bidi_remote:
+		case dicttls.QUICTransportParameter_initial_max_stream_data_bidi_remote:
 			// qtp.InitialMaxStreamDataBidiRemoteLength = uint32(paramValLen)
 			qtp.InitialMaxStreamDataBidiRemote = paramData
 			unsetVLIBits(qtp.InitialMaxStreamDataBidiRemote)
-		case godicttls.QUICTransportParameter_initial_max_stream_data_uni:
+		case dicttls.QUICTransportParameter_initial_max_stream_data_uni:
 			// qtp.InitialMaxStreamDataUniLength = uint32(paramValLen)
 			qtp.InitialMaxStreamDataUni = paramData
 			unsetVLIBits(qtp.InitialMaxStreamDataUni)
-		case godicttls.QUICTransportParameter_initial_max_streams_bidi:
+		case dicttls.QUICTransportParameter_initial_max_streams_bidi:
 			// qtp.InitialMaxStreamsBidiLength = uint32(paramValLen)
 			qtp.InitialMaxStreamsBidi = paramData
 			unsetVLIBits(qtp.InitialMaxStreamsBidi)
-		case godicttls.QUICTransportParameter_initial_max_streams_uni:
+		case dicttls.QUICTransportParameter_initial_max_streams_uni:
 			// qtp.InitialMaxStreamsUniLength = uint32(paramValLen)
 			qtp.InitialMaxStreamsUni = paramData
 			unsetVLIBits(qtp.InitialMaxStreamsUni)
-		case godicttls.QUICTransportParameter_ack_delay_exponent:
+		case dicttls.QUICTransportParameter_ack_delay_exponent:
 			// qtp.AckDelayExponentLength = uint32(paramValLen)
 			qtp.AckDelayExponent = paramData
 			unsetVLIBits(qtp.AckDelayExponent)
-		case godicttls.QUICTransportParameter_max_ack_delay:
+		case dicttls.QUICTransportParameter_max_ack_delay:
 			// qtp.MaxAckDelayLength = uint32(paramValLen)
 			qtp.MaxAckDelay = paramData
 			unsetVLIBits(qtp.MaxAckDelay)
-		case godicttls.QUICTransportParameter_active_connection_id_limit:
+		case dicttls.QUICTransportParameter_active_connection_id_limit:
 			// qtp.ActiveConnectionIDLimitLength = uint32(paramValLen)
 			qtp.ActiveConnectionIDLimit = paramData
 			unsetVLIBits(qtp.ActiveConnectionIDLimit)
@@ -149,48 +146,12 @@ func ParseQUICTransportParameters(extData []byte) *QUICTransportParameters {
 	})
 
 	qtp.parseError = nil
+	qtp.NumID = qtp.calcNumericID()
+	qtp.HexID = FingerprintID(qtp.NumID).AsHex()
 	return qtp
 }
 
 // ParseError returns the error that occurred during parsing, if any.
 func (qtp *QUICTransportParameters) ParseError() error {
 	return qtp.parseError
-}
-
-// NID returns the numeric ID of this transport parameters combination.
-func (qtp *QUICTransportParameters) NID() uint64 {
-	if qtp.NumericID != 0 {
-		return qtp.NumericID
-	}
-
-	h := sha1.New() // skipcq: GO-S1025, GSC-G401
-	updateArr(h, qtp.MaxIdleTimeout)
-	updateArr(h, qtp.MaxUDPPayloadSize)
-	updateArr(h, qtp.InitialMaxData)
-	updateArr(h, qtp.InitialMaxStreamDataBidiLocal)
-	updateArr(h, qtp.InitialMaxStreamDataBidiRemote)
-	updateArr(h, qtp.InitialMaxStreamDataUni)
-	updateArr(h, qtp.InitialMaxStreamsBidi)
-	updateArr(h, qtp.InitialMaxStreamsUni)
-	updateArr(h, qtp.AckDelayExponent)
-	updateArr(h, qtp.MaxAckDelay)
-	updateArr(h, qtp.ActiveConnectionIDLimit)
-
-	updateU32(h, uint32(len(qtp.QTPIDs)))
-	for _, id := range qtp.QTPIDs {
-		updateU64(h, id)
-	}
-
-	qtp.NumericID = binary.BigEndian.Uint64(h.Sum(nil))
-	return qtp.NumericID
-}
-
-// HID returns the hex ID of this transport parameters combination.
-func (qtp *QUICTransportParameters) HID() string {
-	nid := qtp.NID()
-	hid := make([]byte, 8)
-	binary.BigEndian.PutUint64(hid, nid)
-
-	qtp.HexID = hex.EncodeToString(hid)
-	return qtp.HexID
 }

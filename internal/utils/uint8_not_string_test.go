@@ -19,9 +19,9 @@ func TestUint8Arr(t *testing.T) {
 	}
 
 	// testStruct: {Name:gaukas Age:18 Topics:[72 101 108 108 111]}
-	m, err := json.Marshal(testStruct)
+	_, err := json.Marshal(testStruct)
 	if err != nil {
 		t.Fatalf("json.Marshal error: %v", err)
 	}
-	t.Logf("json.Marshal: %s", m)
+	// t.Logf("json.Marshal: %s", m)
 }
