@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 )
 
 type QUICClientHelloReconstructor struct {
@@ -15,9 +16,16 @@ type QUICClientHelloReconstructor struct {
 }
 
 func NewQUICClientHelloReconstructor() *QUICClientHelloReconstructor {
-	return &QUICClientHelloReconstructor{
+	qchr := &QUICClientHelloReconstructor{
 		frags: make(map[uint64][]byte),
 	}
+
+	runtime.SetFinalizer(qchr, func(q *QUICClientHelloReconstructor) {
+		q.buf = nil
+		q.frags = nil
+	})
+
+	return qchr
 }
 
 var (

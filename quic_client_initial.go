@@ -1,11 +1,9 @@
 package clienthellod
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"runtime"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -36,37 +34,13 @@ func UnmarshalQUICClientInitialPacket(p []byte) (ci *ClientInitial, err error) {
 
 	ci.FrameTypes = ci.frames.FrameTypes()
 
-	// reassembledCRYPTOFrame, err := ReassembleCRYPTOFrames(cip.Header.Frames())
-	// if err != nil {
-	// 	return cip, err
-	// }
-
-	// if len(reassembledCRYPTOFrame) == 0 {
-	// 	return cip, fmt.Errorf("%w: no CRYPTO frames found in the packet", ErrNoQUICClientHello)
-	// }
-
-	// cip.QCH, err = ParseQUICClientHello(reassembledCRYPTOFrame)
-	// if err != nil {
-	// 	return cip, fmt.Errorf("%w, ParseQUICClientHello(): %v", ErrNoQUICClientHello, err)
-	// }
-	// cip.QCH.FingerprintID(true)  // normalized
-	// cip.QCH.FingerprintID(false) // original
-	// if cip.QCH.qtp != nil {
-	// 	cip.QTP = cip.QCH.qtp
-	// 	cip.QCH.qtp.HID()
-	// } else {
-	// 	return cip, fmt.Errorf("%w: no QUIC Transport Parameters found in the packet", ErrNoQUICClientHello)
-	// }
-
-	// // Calculate fp
-	// h := sha1.New() // skipcq: GO-S1025, GSC-G401
-	// updateU64(h, cip.QHdr.NID())
-	// updateU64(h, uint64(cip.QCH.FingerprintNID(true)))
-	// updateU64(h, cip.QTP.NumericID)
-	// cip.NumericID = binary.BigEndian.Uint64(h.Sum(nil))
-	// hid := make([]byte, 8)
-	// binary.BigEndian.PutUint64(hid, cip.NumericID)
-	// cip.HexID = hex.EncodeToString(hid)
+	// Make sure first GC completely releases all resources as possible
+	runtime.SetFinalizer(ci, func(c *ClientInitial) {
+		c.Header = nil
+		c.FrameTypes = nil
+		c.frames = nil
+		c.raw = nil
+	})
 
 	return ci, nil
 }
@@ -74,8 +48,10 @@ func UnmarshalQUICClientInitialPacket(p []byte) (ci *ClientInitial, err error) {
 // GatheredClientInitials represents a series of Initial Packets sent by the Client to initiate
 // the QUIC handshake.
 type GatheredClientInitials struct {
-	Packets   []*ClientInitial `json:"packets,omitempty"` // sorted by ClientInitial.PacketNumber
-	pktsMutex *sync.Mutex
+	Packets         []*ClientInitial `json:"packets,omitempty"` // sorted by ClientInitial.PacketNumber
+	maxPacketNumber uint64           // if incomingPacketNumber > maxPacketNumber, will reject the packet
+	maxPacketCount  uint64           // if len(Packets) >= maxPacketCount, will reject any new packets
+	pktsMutex       *sync.Mutex
 
 	clientHelloReconstructor *QUICClientHelloReconstructor
 	ClientHello              *QUICClientHello         `json:"client_hello,omitempty"`         // TLS ClientHello
@@ -84,29 +60,57 @@ type GatheredClientInitials struct {
 	HexID string `json:"hex_id,omitempty"`
 	NumID uint64 `json:"num_id,omitempty"`
 
-	expiringCtx       context.Context
-	cancelExpiringCtx context.CancelFunc
-	completed         atomic.Bool
-	completeChan      chan struct{}
+	deadline              time.Time
+	completed             atomic.Bool
+	completeChan          chan struct{}
+	completeChanCloseOnce sync.Once
 }
+
+const (
+	DEFAULT_MAX_INITIAL_PACKET_NUMBER uint64 = 32
+	DEFAULT_MAX_INITIAL_PACKET_COUNT  uint64 = 4
+)
+
+var (
+	ErrGatheringExpired                                    = errors.New("ClientInitials gathering has expired")
+	ErrPacketRejected                                      = errors.New("packet rejected based upon rules")
+	ErrGatheredClientInitialsChannelClosedBeforeCompletion = errors.New("completion notification channel closed before setting completion flag")
+)
 
 // GatherClientInitialPackets reads a series of Client Initial Packets from the input channel
 // and returns the result of the gathered packets.
 func GatherClientInitials() *GatheredClientInitials {
-	return &GatheredClientInitials{
+	gci := &GatheredClientInitials{
 		Packets:                  make([]*ClientInitial, 0, 4), // expecting 4 packets at max
+		maxPacketNumber:          DEFAULT_MAX_INITIAL_PACKET_NUMBER,
+		maxPacketCount:           DEFAULT_MAX_INITIAL_PACKET_COUNT,
 		pktsMutex:                &sync.Mutex{},
 		clientHelloReconstructor: NewQUICClientHelloReconstructor(),
-		expiringCtx:              context.Background(), // by default, never expire
-		cancelExpiringCtx:        func() {},
 		completed:                atomic.Bool{},
 		completeChan:             make(chan struct{}),
+		completeChanCloseOnce:    sync.Once{},
 	}
+
+	// Make sure first GC completely releases all resources as possible
+	runtime.SetFinalizer(gci, func(g *GatheredClientInitials) {
+		g.Packets = nil
+
+		g.clientHelloReconstructor = nil
+		g.ClientHello = nil
+		g.TransportParameters = nil
+
+		g.completeChanCloseOnce.Do(func() {
+			close(g.completeChan)
+		})
+		g.completeChan = nil
+	})
+
+	return gci
 }
 
-func GatherClientInitialsUntil(expiry time.Time) *GatheredClientInitials {
+func GatherClientInitialsWithDeadline(deadline time.Time) *GatheredClientInitials {
 	gci := GatherClientInitials()
-	gci.expiringCtx, gci.cancelExpiringCtx = context.WithDeadline(context.Background(), expiry)
+	gci.SetDeadline(deadline)
 	return gci
 }
 
@@ -115,11 +119,17 @@ func (gci *GatheredClientInitials) AddPacket(cip *ClientInitial) error {
 	defer gci.pktsMutex.Unlock()
 
 	if gci.Expired() { // not allowing new packets after expiry
-		return errors.New("ClientInitials gathering has expired")
+		return ErrGatheringExpired
 	}
 
 	if gci.ClientHello != nil { // parse complete, new packet likely to be an ACK-only frame, ignore
 		return nil
+	}
+
+	// check if packet needs to be rejected based upon set maxPacketNumber and maxPacketCount
+	if cip.Header.initialPacketNumber > atomic.LoadUint64(&gci.maxPacketNumber) ||
+		uint64(len(gci.Packets)) >= atomic.LoadUint64(&gci.maxPacketCount) {
+		return ErrPacketRejected
 	}
 
 	// check if duplicate packet number was received, if so, discard
@@ -147,8 +157,14 @@ func (gci *GatheredClientInitials) AddPacket(cip *ClientInitial) error {
 	return gci.lockedGatherComplete()
 }
 
+// Completed returns true if the GatheredClientInitials is complete.
+func (gci *GatheredClientInitials) Completed() bool {
+	return gci.completed.Load()
+}
+
+// Expired returns true if the GatheredClientInitials has expired.
 func (gci *GatheredClientInitials) Expired() bool {
-	return gci.expiringCtx.Err() != nil
+	return time.Now().After(gci.deadline)
 }
 
 func (gci *GatheredClientInitials) lockedGatherComplete() error {
@@ -167,20 +183,34 @@ func (gci *GatheredClientInitials) lockedGatherComplete() error {
 	atomic.StoreUint64(&gci.NumID, numericID)
 	gci.HexID = FingerprintID(numericID).AsHex()
 
-	// cancel the expiry context if any
-	gci.cancelExpiringCtx()
-
 	// Finally, mark the completion
 	gci.completed.Store(true)
-	close(gci.completeChan)
-
-	b, err := json.Marshal(gci)
-	if err != nil {
-		return err
-	}
-	log.Printf("GatheredClientInitials: %s", string(b))
+	gci.completeChanCloseOnce.Do(func() {
+		close(gci.completeChan)
+	})
 
 	return nil
+}
+
+// SetDeadline sets the deadline for the GatheredClientInitials to complete.
+func (gci *GatheredClientInitials) SetDeadline(deadline time.Time) {
+	gci.deadline = deadline
+}
+
+// SetMaxPacketNumber sets the maximum packet number to be gathered.
+// If a Client Initial packet with a higher packet number is received, it will be rejected.
+//
+// This function can be used as a precaution against memory exhaustion attacks.
+func (gci *GatheredClientInitials) SetMaxPacketNumber(maxPacketNumber uint64) {
+	atomic.StoreUint64(&gci.maxPacketNumber, maxPacketNumber)
+}
+
+// SetMaxPacketCount sets the maximum number of packets to be gathered.
+// If more Client Initial packets are received, they will be rejected.
+//
+// This function can be used as a precaution against memory exhaustion attacks.
+func (gci *GatheredClientInitials) SetMaxPacketCount(maxPacketCount uint64) {
+	atomic.StoreUint64(&gci.maxPacketCount, maxPacketCount)
 }
 
 // Wait blocks until the GatheredClientInitials is complete or expired.
@@ -190,13 +220,12 @@ func (gci *GatheredClientInitials) Wait() error {
 	}
 
 	select {
-	case <-gci.expiringCtx.Done():
-		return gci.expiringCtx.Err()
+	case <-time.After(time.Until(gci.deadline)):
+		return ErrGatheringExpired
 	case <-gci.completeChan:
-		return nil
+		if gci.completed.Load() {
+			return nil
+		}
+		return ErrGatheredClientInitialsChannelClosedBeforeCompletion // divergent state, only possible reason is GC
 	}
-}
-
-func (gci *GatheredClientInitials) Completed() bool {
-	return gci.completed.Load()
 }

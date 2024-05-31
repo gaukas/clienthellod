@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"sort"
 
 	"github.com/gaukas/clienthellod/internal/utils"
@@ -51,8 +52,6 @@ type ClientHello struct {
 	alpnWithLengths                 []uint8
 	lengthPrefixedCertCompressAlgos []uint8
 	keyshareGroupsWithLengths       []uint16
-	// _nid                            int64
-	// norm_nid                        int64
 
 	// QUIC-only
 	qtp *QUICTransportParameters
@@ -133,6 +132,10 @@ func (ch *ClientHello) ParseClientHello() error {
 		return errors.New("failed to parse ClientHello, (*tls.ClientHelloInfo).Unmarshal(): nil")
 	}
 	ch.ServerName = chm.ServerName
+
+	runtime.SetFinalizer(ch, func(c *ClientHello) {
+		c.qtp = nil // other trivial types are easy to GC
+	})
 
 	// In the end parse extra information from raw
 	return ch.parseExtra()

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -42,6 +43,10 @@ func GenerateQUICFingerprint(gci *GatheredClientInitials) (*QUICFingerprint, err
 
 	qfp.NumID = binary.BigEndian.Uint64(h.Sum(nil))
 	qfp.HexID = FingerprintID(qfp.NumID).AsHex()
+
+	runtime.SetFinalizer(qfp, func(q *QUICFingerprint) {
+		q.ClientInitials = nil
+	})
 
 	return qfp, nil
 }
@@ -96,7 +101,7 @@ func (qfp *QUICFingerprinter) HandlePacket(from string, p []byte) error {
 	if qfp.timeout == time.Duration(0) {
 		testGci = GatherClientInitials()
 	} else {
-		testGci = GatherClientInitialsUntil(time.Now().Add(qfp.timeout))
+		testGci = GatherClientInitialsWithDeadline(time.Now().Add(qfp.timeout))
 	}
 
 	chosenGci, existing := qfp.mapGatheringClientInitials.LoadOrStore(from, testGci)
