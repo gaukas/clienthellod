@@ -43,7 +43,7 @@ type QUICTransportParameters struct {
 // TLS Extension "QUIC Transport Parameters" (57)
 //
 // If any error occurs, the returned struct will have parseError set to the error.
-func ParseQUICTransportParameters(extData []byte) *QUICTransportParameters {
+func ParseQUICTransportParameters(extData []byte) *QUICTransportParameters { // skipcq: GO-R1005
 	qtp := &QUICTransportParameters{
 		parseError: errors.New("unknown error"),
 	}

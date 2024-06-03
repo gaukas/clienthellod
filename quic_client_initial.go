@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-// skipcq: GSC-G505
-
 type ClientInitial struct {
 	Header     *QUICHeader `json:"header,omitempty"` // QUIC header
 	FrameTypes []uint64    `json:"frames,omitempty"` // frames ID in order
