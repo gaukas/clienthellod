@@ -4,6 +4,7 @@ import (
 	"bytes"
 )
 
+// QUICClientHello represents a QUIC ClientHello.
 type QUICClientHello struct {
 	ClientHello
 }

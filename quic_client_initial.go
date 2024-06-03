@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// ClientInitial represents a QUIC Initial Packet sent by the Client.
 type ClientInitial struct {
 	Header     *QUICHeader `json:"header,omitempty"` // QUIC header
 	FrameTypes []uint64    `json:"frames,omitempty"` // frames ID in order
@@ -106,6 +107,7 @@ func GatherClientInitials() *GatheredClientInitials {
 	return gci
 }
 
+// GatherClientInitialsWithDeadline is a helper function to create a GatheredClientInitials with a deadline.
 func GatherClientInitialsWithDeadline(deadline time.Time) *GatheredClientInitials {
 	gci := GatherClientInitials()
 	gci.SetDeadline(deadline)

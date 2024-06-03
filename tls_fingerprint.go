@@ -13,6 +13,7 @@ import (
 
 const DEFAULT_TLSFINGERPRINT_EXPIRY = 10 * time.Second
 
+// TLSFingerprinter can be used to fingerprint TLS connections.
 type TLSFingerprinter struct {
 	mapClientHellos *sync.Map
 
@@ -20,6 +21,7 @@ type TLSFingerprinter struct {
 	closed  atomic.Bool
 }
 
+// NewTLSFingerprinter creates a new TLSFingerprinter.
 func NewTLSFingerprinter() *TLSFingerprinter {
 	return &TLSFingerprinter{
 		mapClientHellos: new(sync.Map),
@@ -27,6 +29,7 @@ func NewTLSFingerprinter() *TLSFingerprinter {
 	}
 }
 
+// NewTLSFingerprinterWithTimeout creates a new TLSFingerprinter with a timeout.
 func NewTLSFingerprinterWithTimeout(timeout time.Duration) *TLSFingerprinter {
 	return &TLSFingerprinter{
 		mapClientHellos: new(sync.Map),
@@ -35,10 +38,12 @@ func NewTLSFingerprinterWithTimeout(timeout time.Duration) *TLSFingerprinter {
 	}
 }
 
+// SetTimeout sets the timeout for the TLSFingerprinter.
 func (tfp *TLSFingerprinter) SetTimeout(timeout time.Duration) {
 	tfp.timeout = timeout
 }
 
+// HandleMessage handles a message.
 func (tfp *TLSFingerprinter) HandleMessage(from string, p []byte) error {
 	if tfp.closed.Load() {
 		return errors.New("TLSFingerprinter closed")
@@ -62,6 +67,7 @@ func (tfp *TLSFingerprinter) HandleMessage(from string, p []byte) error {
 	return nil
 }
 
+// HandleTCPConn handles a TCP connection.
 func (tfp *TLSFingerprinter) HandleTCPConn(conn net.Conn) (rewindConn net.Conn, err error) {
 	if tfp.closed.Load() {
 		return nil, errors.New("TLSFingerprinter closed")
@@ -89,6 +95,7 @@ func (tfp *TLSFingerprinter) HandleTCPConn(conn net.Conn) (rewindConn net.Conn, 
 	return utils.RewindConn(conn, ch.Raw())
 }
 
+// Lookup looks up a ClientHello.
 func (tfp *TLSFingerprinter) Lookup(from string) *ClientHello {
 	ch, ok := tfp.mapClientHellos.LoadAndDelete(from)
 	if !ok {
@@ -103,6 +110,7 @@ func (tfp *TLSFingerprinter) Lookup(from string) *ClientHello {
 	return clientHello
 }
 
+// Close closes the TLSFingerprinter.
 func (tfp *TLSFingerprinter) Close() {
 	tfp.closed.Store(true)
 }

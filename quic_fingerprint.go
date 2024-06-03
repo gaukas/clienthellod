@@ -14,6 +14,7 @@ import (
 	"github.com/gaukas/clienthellod/internal/utils"
 )
 
+// QUICFingerprint can be used to generate a fingerprint of a QUIC connection.
 type QUICFingerprint struct {
 	ClientInitials *GatheredClientInitials
 
@@ -23,6 +24,7 @@ type QUICFingerprint struct {
 	UserAgent string `json:"user_agent,omitempty"` // User-Agent header, set by the caller
 }
 
+// GenerateQUICFingerprint generates a QUICFingerprint from the gathered ClientInitials.
 func GenerateQUICFingerprint(gci *GatheredClientInitials) (*QUICFingerprint, error) {
 	if err := gci.Wait(); err != nil {
 		return nil, err // GatheringClientInitials failed (expired before complete)
@@ -51,6 +53,7 @@ func GenerateQUICFingerprint(gci *GatheredClientInitials) (*QUICFingerprint, err
 
 const DEFAULT_QUICFINGERPRINT_EXPIRY = 10 * time.Second
 
+// QUICFingerprinter can be used to fingerprint QUIC connections.
 type QUICFingerprinter struct {
 	mapGatheringClientInitials *sync.Map
 
@@ -58,6 +61,7 @@ type QUICFingerprinter struct {
 	closed  atomic.Bool
 }
 
+// NewQUICFingerprinter creates a new QUICFingerprinter.
 func NewQUICFingerprinter() *QUICFingerprinter {
 	return &QUICFingerprinter{
 		mapGatheringClientInitials: new(sync.Map),
@@ -65,6 +69,7 @@ func NewQUICFingerprinter() *QUICFingerprinter {
 	}
 }
 
+// NewQUICFingerprinterWithTimeout creates a new QUICFingerprinter with a timeout.
 func NewQUICFingerprinterWithTimeout(timeout time.Duration) *QUICFingerprinter {
 	return &QUICFingerprinter{
 		mapGatheringClientInitials: new(sync.Map),
@@ -73,10 +78,12 @@ func NewQUICFingerprinterWithTimeout(timeout time.Duration) *QUICFingerprinter {
 	}
 }
 
+// SetTimeout sets the timeout for gathering ClientInitials.
 func (qfp *QUICFingerprinter) SetTimeout(timeout time.Duration) {
 	qfp.timeout = timeout
 }
 
+// HandlePacket handles a QUIC packet.
 func (qfp *QUICFingerprinter) HandlePacket(from string, p []byte) error {
 	if qfp.closed.Load() {
 		return errors.New("QUICFingerprinter closed")
@@ -120,6 +127,7 @@ func (qfp *QUICFingerprinter) HandlePacket(from string, p []byte) error {
 	return gci.AddPacket(ci)
 }
 
+// HandleUDPConn handles a QUIC connection over UDP.
 func (qfp *QUICFingerprinter) HandleUDPConn(pc net.PacketConn) error {
 	var buf [2048]byte
 	for {
@@ -139,6 +147,7 @@ func (qfp *QUICFingerprinter) HandleUDPConn(pc net.PacketConn) error {
 	}
 }
 
+// HandleIPConn handles a QUIC connection over IP.
 func (qfp *QUICFingerprinter) HandleIPConn(ipc *net.IPConn) error {
 	var buf [2048]byte
 	for {
@@ -167,6 +176,7 @@ func (qfp *QUICFingerprinter) HandleIPConn(ipc *net.IPConn) error {
 	}
 }
 
+// Lookup looks up a QUICFingerprint for a given key.
 func (qfp *QUICFingerprinter) Lookup(from string) *QUICFingerprint {
 	gci, ok := qfp.mapGatheringClientInitials.Load(from) // when using LoadAndDelete, some implementations "wasting" QUIC connections will fail
 	if !ok {
@@ -190,6 +200,7 @@ func (qfp *QUICFingerprinter) Lookup(from string) *QUICFingerprint {
 	return qf
 }
 
+// LookupAwait looks up a QUICFingerprint for a given key, waiting for the gathering to complete.
 func (qfp *QUICFingerprinter) LookupAwait(from string) (*QUICFingerprint, error) {
 	gci, ok := qfp.mapGatheringClientInitials.Load(from) // when using LoadAndDelete, some implementations "wasting" QUIC connections will fail
 	if !ok {
@@ -209,6 +220,7 @@ func (qfp *QUICFingerprinter) LookupAwait(from string) (*QUICFingerprint, error)
 	return qf, nil
 }
 
+// Close closes the QUICFingerprinter.
 func (qfp *QUICFingerprinter) Close() {
 	qfp.closed.Store(true)
 }

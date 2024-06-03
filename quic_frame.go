@@ -14,6 +14,7 @@ const (
 	QUICFrame_CRYPTO  uint64 = 6 // 6
 )
 
+// QUICFrame is the interface that wraps the basic methods of a QUIC frame.
 type QUICFrame interface {
 	// FrameType returns the type of the frame.
 	FrameType() uint64
@@ -27,6 +28,7 @@ type QUICFrame interface {
 	ReadReader(io.Reader) (io.Reader, error)
 }
 
+// ReadAllFrames reads all QUIC frames from the input reader.
 func ReadAllFrames(r io.Reader) ([]QUICFrame, error) {
 	var frames []QUICFrame = make([]QUICFrame, 0)
 
@@ -64,6 +66,8 @@ func ReadAllFrames(r io.Reader) ([]QUICFrame, error) {
 	}
 }
 
+// ReassembleCRYPTOFrames reassembles CRYPTO frames into a single byte slice that
+// consists of the entire CRYPTO data.
 func ReassembleCRYPTOFrames(frames []QUICFrame) ([]byte, error) {
 	var cryptoFrames []QUICFrame = make([]QUICFrame, 0)
 
@@ -96,8 +100,10 @@ func ReassembleCRYPTOFrames(frames []QUICFrame) ([]byte, error) {
 	return reassembled, nil
 }
 
+// QUICFrames is a slice of QUICFrame.
 type QUICFrames []QUICFrame
 
+// FrameTypes returns the frame types of all QUIC frames.
 func (qfs QUICFrames) FrameTypes() []uint64 {
 	var frameTypes []uint64 = make([]uint64, 0)
 
@@ -108,6 +114,7 @@ func (qfs QUICFrames) FrameTypes() []uint64 {
 	return frameTypes
 }
 
+// FrameTypesUint8 returns the frame types of all QUIC frames as uint8.
 func (qfs QUICFrames) FrameTypesUint8() []uint8 {
 	var frameTypesUint8 []uint8 = make([]uint8, 0)
 
