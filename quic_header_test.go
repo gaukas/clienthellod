@@ -35,6 +35,14 @@ var (
 
 		HasToken: false,
 	}
+	quicHeaderTruth_Firefox126_0_RTT = &QUICHeader{
+		Version:      []byte{0x00, 0x00, 0x00, 0x01},
+		DCIDLength:   9,
+		SCIDLength:   3,
+		PacketNumber: []byte{0x00},
+
+		HasToken: true,
+	}
 )
 
 func testQUICHeaderEqualsTruth(t *testing.T, header, truth *QUICHeader) {

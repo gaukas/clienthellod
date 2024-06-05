@@ -13,27 +13,34 @@ import (
 const (
 	CaddyAppID = "clienthellod"
 
-	DEFAULT_RESERVOIR_ENTRY_VALID_FOR   = 10 * time.Second
-	DEFAULT_RESERVOIR_CLEANING_INTERVAL = 10 * time.Second
+	DEFAULT_TLS_FP_TTL  = clienthellod.DEFAULT_TLSFINGERPRINT_EXPIRY  // TODO: select a reasonable value
+	DEFAULT_QUIC_FP_TTL = clienthellod.DEFAULT_QUICFINGERPRINT_EXPIRY // TODO: select a reasonable value
 )
 
 func init() {
 	caddy.RegisterModule(Reservoir{})
 }
 
-// Reservoir implements caddy.App.
+// Reservoir implements [caddy.App] and [caddy.Provisioner].
 // It is used to store the ClientHello extracted from the incoming TLS
 // by ListenerWrapper for later use by the Handler when ServeHTTP is called.
 type Reservoir struct {
-	ValidFor caddy.Duration `json:"valid_for,omitempty"`
-
-	// CleanInterval is the interval at which the reservoir is cleaned
-	// of expired entries.
+	// TlsTTL (Time-to-Live) is the duration for which each TLS fingerprint
+	// is valid. The entry will remain in the reservoir for at most this
+	// duration.
 	//
-	// Deprecated: this field is no longer used. Each entry is cleaned on
-	// its own schedule, based on its expiry time. Setting ValidFor is
-	// sufficient.
-	CleanInterval caddy.Duration `json:"clean_interval,omitempty"`
+	// There are scenarios an entry gets removed sooner than this duration, including
+	// when a TLS ClientHello is successfully served by the handler.
+	TlsTTL caddy.Duration `json:"tls_ttl,omitempty"`
+
+	// QuicTTL (Time-to-Live) is the duration for which each QUIC fingerprint
+	// is valid. The entry will remain in the reservoir for at most this
+	// duration.
+	//
+	// Given the fact that some implementations would prefer reusing the previously established
+	// QUIC connection instead of establishing a new one everytime, it is recommended to set
+	// a longer TTL for QUIC.
+	QuicTTL caddy.Duration `json:"quic_ttl,omitempty"`
 
 	tlsFingerprinter        *clienthellod.TLSFingerprinter
 	quicFingerprinter       *clienthellod.QUICFingerprinter
@@ -49,8 +56,8 @@ func (Reservoir) CaddyModule() caddy.ModuleInfo { // skipcq: GO-W1029
 		ID: CaddyAppID,
 		New: func() caddy.Module {
 			reservoir := &Reservoir{
-				ValidFor: caddy.Duration(DEFAULT_RESERVOIR_ENTRY_VALID_FOR),
-				// CleanInterval: caddy.Duration(DEFAULT_RESERVOIR_CLEANING_INTERVAL),
+				TlsTTL:  caddy.Duration(DEFAULT_TLS_FP_TTL),
+				QuicTTL: caddy.Duration(DEFAULT_QUIC_FP_TTL),
 			}
 
 			return reservoir
@@ -72,9 +79,9 @@ func (r *Reservoir) QUICFingerprinter() *clienthellod.QUICFingerprinter { // ski
 func (r *Reservoir) NewQUICVisitor(ip, fullKey string) { // skipcq: GO-W1029
 	r.mapLastQUICVisitorPerIP.Store(ip, fullKey)
 
-	// delete it after validfor if not updated
+	// delete it after TTL if not updated
 	go func() {
-		<-time.After(time.Duration(r.ValidFor))
+		<-time.After(time.Duration(r.QuicTTL))
 		r.mapLastQUICVisitorPerIP.CompareAndDelete(ip, fullKey)
 	}()
 }
@@ -91,13 +98,9 @@ func (r *Reservoir) GetLastQUICVisitor(ip string) (string, bool) { // skipcq: GO
 
 // Start implements Start() of caddy.App.
 func (r *Reservoir) Start() error { // skipcq: GO-W1029
-	if r.ValidFor <= 0 {
-		return errors.New("validfor must be a positive duration")
+	if r.QuicTTL <= 0 || r.TlsTTL <= 0 {
+		return errors.New("ttl must be a positive duration")
 	}
-
-	// if r.CleanInterval <= 0 {
-	// 	return errors.New("clean_interval must be a positive duration")
-	// }
 
 	r.logger.Info("clienthellod reservoir is started")
 
@@ -113,10 +116,11 @@ func (r *Reservoir) Stop() error { // skipcq: GO-W1029
 
 // Provision implements Provision() of caddy.Provisioner.
 func (r *Reservoir) Provision(ctx caddy.Context) error { // skipcq: GO-W1029
-	r.logger = ctx.Logger(r)
-	r.tlsFingerprinter = clienthellod.NewTLSFingerprinterWithTimeout(time.Duration(r.ValidFor))
-	r.quicFingerprinter = clienthellod.NewQUICFingerprinterWithTimeout(time.Duration(r.ValidFor))
+	r.tlsFingerprinter = clienthellod.NewTLSFingerprinterWithTimeout(time.Duration(r.TlsTTL))
+	r.quicFingerprinter = clienthellod.NewQUICFingerprinterWithTimeout(time.Duration(r.QuicTTL))
 	r.mapLastQUICVisitorPerIP = new(sync.Map)
+
+	r.logger = ctx.Logger(r)
 
 	r.logger.Info("clienthellod reservoir is provisioned")
 	return nil

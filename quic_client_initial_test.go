@@ -16,6 +16,9 @@ var mapGatheredClientInitials = map[string][][]byte{
 	"Firefox126": {
 		quicIETFData_Firefox126,
 	},
+	"Firefox126_0-RTT": {
+		quicIETFData_Firefox126_0_RTT,
+	},
 }
 
 func TestGatherClientInitials(t *testing.T) {
@@ -62,7 +65,6 @@ func TestGatheredClientInitialsGC(t *testing.T) {
 	for gcCnt < 5 {
 		select {
 		case <-gcOk:
-			t.Logf("GatheredClientInitials is GCed after %d GC cycles", gcCnt)
 			return
 		default:
 			runtime.GC()
@@ -70,5 +72,5 @@ func TestGatheredClientInitialsGC(t *testing.T) {
 		}
 	}
 
-	t.Fatalf("GatheredClientInitials is not GCed")
+	t.Fatalf("GatheredClientInitials is not GCed within 5 cycles")
 }

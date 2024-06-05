@@ -72,42 +72,35 @@ func (h *Handler) Provision(ctx caddy.Context) error { // skipcq: GO-W1029
 	return nil
 }
 
+// ServeHTTP
 func (h *Handler) ServeHTTP(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
 	h.logger.Debug("Sering HTTP to " + req.RemoteAddr + " on Protocol " + req.Proto)
 
-	if h.TLS && req.ProtoMajor <= 2 { // HTTP/1.0, HTTP/1.1, H2
-		return h.serveHTTP12(wr, req, next) // TLS ClientHello capture enabled, serve ClientHello
-	} else if h.QUIC {
-		if req.ProtoMajor == 3 { // QUIC
-			return h.serveQUIC(wr, req, next)
-		} else {
-			h.logger.Debug("Serving QUIC Fingerprint over TLS")
-			return h.serveQUICFingerprintOverTLS(wr, req, next)
-		}
+	if h.TLS && req.ProtoMajor <= 2 { // When TLS is enabled and for HTTP/1.0 or HTTP/1.1 or H2 served over TLS
+		return h.serveTLS(wr, req, next)
+	} else if h.QUIC { // When QUIC is enabled
+		// if req.ProtoMajor == 3 { // QUIC
+		// 	return h.serveQUIC(wr, req, next)
+		// } else {
+		// 	h.logger.Debug("Serving QUIC Fingerprint over TLS")
+		// 	return h.serveQUICFingerprintOverTLS(wr, req, next)
+		// }
+		return h.serveQUIC(wr, req, next)
 	}
 	return next.ServeHTTP(wr, req)
 }
 
-// serveHTTP12 handles HTTP/1.0, HTTP/1.1, H2 requests by looking up the
+// serveTLS handles HTTP/1.0, HTTP/1.1, H2 requests by looking up the
 // ClientHello from the reservoir and writing it to the response.
-func (h *Handler) serveHTTP12(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
+func (h *Handler) serveTLS(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
 	// get the client hello from the reservoir
-	ch := h.reservoir.TLSFingerprinter().Lookup(req.RemoteAddr)
+	ch := h.reservoir.TLSFingerprinter().Pop(req.RemoteAddr)
 	if ch == nil {
 		h.logger.Debug(fmt.Sprintf("Can't extract TLS ClientHello sent by %s, maybe not TLS connection?", req.RemoteAddr))
 		return next.ServeHTTP(wr, req)
 	}
-	h.logger.Debug(fmt.Sprintf("Extracted TLS ClientHello for %s", req.RemoteAddr))
+	// h.logger.Debug(fmt.Sprintf("Extracted TLS ClientHello for %s", req.RemoteAddr))
 
-	// err := ch.ParseClientHello()
-	// if err != nil {
-	// 	h.logger.Error("failed to parse client hello", zap.Error(err))
-	// 	return next.ServeHTTP(wr, req)
-	// }
-
-	h.logger.Debug("ClientHello ID: " + ch.HexID)
-	h.logger.Debug("ClientHello NormID: " + ch.NormHexID)
-	h.logger.Debug("User-Agent: " + req.UserAgent())
 	ch.UserAgent = req.UserAgent()
 
 	// dump JSON
@@ -124,10 +117,11 @@ func (h *Handler) serveHTTP12(wr http.ResponseWriter, req *http.Request, next ca
 	}
 
 	// write JSON to response
-	h.logger.Debug("ClientHello: " + string(b))
 	wr.Header().Set("Content-Type", "application/json")
-	wr.Header().Set("Connection", "close")
-	wr.Header().Set("Alt-Svc", "clear") // to invalidate QUIC
+	if req.ProtoMajor == 1 {
+		wr.Header().Set("Connection", "close") // HTTP/1 only. Forbidden in HTTP/2, HTTP/3
+	}
+	wr.Header().Set("Alt-Svc", "clear") // to prevent web broswers switching to QUIC
 	_, err = wr.Write(b)
 	if err != nil {
 		h.logger.Error("failed to write response", zap.Error(err))
@@ -139,14 +133,35 @@ func (h *Handler) serveHTTP12(wr http.ResponseWriter, req *http.Request, next ca
 // serveQUIC handles QUIC requests by looking up the ClientHello from the
 // reservoir and writing it to the response.
 func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
+	var from string
+
+	if req.ProtoMajor == 3 {
+		from = req.RemoteAddr
+	} else {
+		// Get IP part of the RemoteAddr
+		ip, _, err := net.SplitHostPort(req.RemoteAddr)
+		if err != nil {
+			h.logger.Error(fmt.Sprintf("Can't split IP from %s: %v", req.RemoteAddr, err))
+			return next.ServeHTTP(wr, req)
+		}
+
+		// Get the last QUIC visitor
+		var ok bool
+		from, ok = h.reservoir.GetLastQUICVisitor(ip)
+		if !ok {
+			h.logger.Debug(fmt.Sprintf("Can't find last QUIC visitor for %s", ip))
+			return next.ServeHTTP(wr, req)
+		}
+	}
+
 	// get the client hello from the reservoir
-	qfp, err := h.reservoir.QUICFingerprinter().LookupAwait(req.RemoteAddr)
+	qfp, err := h.reservoir.QUICFingerprinter().PeekAwait(from)
 	if err != nil {
 		h.logger.Error(fmt.Sprintf("Can't extract QUIC fingerprint sent by %s: %v", req.RemoteAddr, err))
 		return next.ServeHTTP(wr, req)
 	}
 
-	h.logger.Debug(fmt.Sprintf("Extracted QUIC fingerprint for %s", req.RemoteAddr))
+	// h.logger.Debug(fmt.Sprintf("Extracted QUIC fingerprint for %s", req.RemoteAddr))
 
 	// Get IP part of the RemoteAddr
 	ip, _, err := net.SplitHostPort(req.RemoteAddr)
@@ -172,56 +187,9 @@ func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next cadd
 
 	// write JSON to response
 	wr.Header().Set("Content-Type", "application/json")
-	wr.Header().Set("Connection", "close")
-	_, err = wr.Write(b)
-	if err != nil {
-		h.logger.Error("failed to write response", zap.Error(err))
-		return next.ServeHTTP(wr, req)
+	if req.ProtoMajor == 1 {
+		wr.Header().Set("Connection", "close") // HTTP/1 only. Forbidden in HTTP/2, HTTP/3
 	}
-	return nil
-}
-
-func (h *Handler) serveQUICFingerprintOverTLS(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
-	// Get IP part of the RemoteAddr
-	ip, _, err := net.SplitHostPort(req.RemoteAddr)
-	if err != nil {
-		h.logger.Error(fmt.Sprintf("Can't extract IP from %s: %v", req.RemoteAddr, err))
-		return next.ServeHTTP(wr, req)
-	}
-
-	// Get the last QUIC visitor
-	fullKey, ok := h.reservoir.GetLastQUICVisitor(ip)
-	if !ok {
-		h.logger.Debug(fmt.Sprintf("Can't find last QUIC visitor for %s", ip))
-		return next.ServeHTTP(wr, req)
-	}
-
-	// Get the client hello from the reservoir
-	// get the client hello from the reservoir
-	qfp, err := h.reservoir.QUICFingerprinter().LookupAwait(fullKey)
-	if err != nil {
-		h.logger.Error(fmt.Sprintf("Can't extract QUIC fingerprint sent by %s: %v", ip, err))
-		return next.ServeHTTP(wr, req)
-	}
-
-	h.logger.Debug(fmt.Sprintf("Extracted QUIC fingerprint for %s", fullKey))
-	// qfp.UserAgent = req.UserAgent() // Should have been updated
-
-	// dump JSON
-	var b []byte
-	if req.URL.Query().Get("beautify") == "true" {
-		b, err = json.MarshalIndent(qfp, "", "  ")
-	} else {
-		b, err = json.Marshal(qfp)
-	}
-	if err != nil {
-		h.logger.Error("failed to marshal QUIC fingerprint into JSON", zap.Error(err))
-		return next.ServeHTTP(wr, req)
-	}
-
-	// write JSON to response
-	wr.Header().Set("Content-Type", "application/json")
-	wr.Header().Set("Connection", "close")
 	_, err = wr.Write(b)
 	if err != nil {
 		h.logger.Error("failed to write response", zap.Error(err))

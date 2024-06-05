@@ -378,6 +378,9 @@ var (
 	quicFramesTruth_Firefox126 = QUICFrames{
 		&CRYPTO{Offset: 0, Length: 633},
 	}
+	quicFramesTruth_Firefox126_0_RTT = QUICFrames{
+		&CRYPTO{Offset: 0, Length: 594},
+	}
 )
 
 func testQUICFramesEqualsTruth(t *testing.T, frames, truths QUICFrames) {

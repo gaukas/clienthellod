@@ -1,24 +1,32 @@
-# clienthellod
+# `clienthellod`: TLS ClientHello/QUIC Initial Packet reflection service
 ![Go Build Status](https://github.com/gaukas/clienthellod/actions/workflows/go.yml/badge.svg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gaukas/clienthellod)](https://goreportcard.com/report/github.com/gaukas/clienthellod)
-[![DeepSource](https://app.deepsource.com/gh/gaukas/clienthellod.svg/?label=active+issues&show_trend=true&token=GugDSBnYAxAF25QNpfyAO5d2)](https://app.deepsource.com/gh/gaukas/clienthellod/)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgaukas%2Fclienthellod.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgaukas%2Fclienthellod?ref=badge_shield&issueType=license)
+[![Go Doc](https://pkg.go.dev/badge/github.com/refraction-networking/water.svg)](https://pkg.go.dev/github.com/refraction-networking/water)
 
-ClientHello Parser/Resolver as a Service from [tlsfingerprint.io](https://tlsfingerprint.io).
+`clienthellod`, read as "client-hello-D", is a TLS ClientHello/QUIC Initial Packet reflection service. It can be used to parses TLS ClientHello messages and QUIC Initial Packets into human-readable and highly programmable formats such as JSON. 
 
-## What does it do
-
-`clienthellod`, read as "client hello DEE", is a service that parses and resolves the ClientHello message sent by the client to the server. It is a part of the TLS fingerprintability research project which spans [tlsfingerprint.io](https://tlsfingerprint.io) and [quic.tlsfingerprint.io](https://quic.tlsfingerprint.io). It parses the ClientHello messages sent by TLS clients and QUIC Client Initial Packets sent by QUIC clients and display the parsed information in a human-readable format with high programmability. 
+Is is a part of the TLS fingerprintability research project which spans [tlsfingerprint.io](https://tlsfingerprint.io) and [quic.tlsfingerprint.io](https://quic.tlsfingerprint.io). It parses the ClientHello messages sent by TLS clients and QUIC Client Initial Packets sent by QUIC clients and display the parsed information in a human-readable format with high programmability. 
 
 See [tlsfingerprint.io](https://tlsfingerprint.io) and [quic.tlsfingerprint.io](https://quic.tlsfingerprint.io) for more details about the project.
 
-## How to use
+## Quick Start
 
-`clienthellod` is provided as a Go library in the root directory of this repository. 
+`clienthellod` comes as a Go library, which can be used to parse both TLS and QUIC protocols. 
 
-### Quick Start
+### TLS/QUIC Fingerprinter
 
-#### TLS ClientHello
+```go
+    tlsFingerprinter := clienthellod.NewTLSFingerprinter()
+```
+
+```go
+    quicFingerprinter := clienthellod.NewQUICFingerprinter()
+```
+
+### TLS ClientHello
+
+#### From a `net.Conn`
 
 ```go
     tcpLis, err := net.Listen("tcp", ":443")
@@ -30,7 +38,7 @@ See [tlsfingerprint.io](https://tlsfingerprint.io) and [quic.tlsfingerprint.io](
 	}
     defer conn.Close()
 
-	ch, err := clienthellod.ReadClientHello(conn) // saves ClientHello
+	ch, err := clienthellod.ReadClientHello(conn) // reads ClientHello from the connection
     if err != nil {
         panic(err)
     }
@@ -46,11 +54,24 @@ See [tlsfingerprint.io](https://tlsfingerprint.io) and [quic.tlsfingerprint.io](
     }
 
     fmt.Println(string(jsonB))
-    fmt.Println("ClientHello ID: " + ch.FingerprintID(false)) // prints ClientHello's original fingerprint ID, as TLS extension IDs in their provided order
-    fmt.Println("ClientHello NormID: " + ch.FingerprintID(true)) // prints ClientHello's normalized fingerprint ID, as TLS extension IDs in a sorted order
+    fmt.Println("ClientHello ID: " + ch.HexID) // prints ClientHello's original fingerprint ID calculated using observed TLS extension order
+    fmt.Println("ClientHello NormID: " + ch.NormHexID) // prints ClientHello's normalized fingerprint ID calculated using sorted TLS extension list
 ```
 
-#### QUIC Client Initial Packet
+#### From raw `[]byte`
+
+```go
+    ch, err := clienthellod.UnmarshalClientHello(raw)
+    if err != nil {
+        panic(err)
+    }
+    
+    // err := ch.ParseClientHello() // no need to call again, UnmarshalClientHello automatically calls ParseClientHello
+```
+
+### QUIC Initial Packets (Client-sourced)
+
+#### Single packet
 
 ```go
     udpConn, err := net.ListenUDP("udp", ":443")
@@ -62,7 +83,7 @@ See [tlsfingerprint.io](https://tlsfingerprint.io) and [quic.tlsfingerprint.io](
         panic(err)
     }
 
-    cip, err := clienthellod.ParseQUICCIP(buf[:n]) // reads in and parses QUIC Client Initial Packet
+    ci, err := clienthellod.UnmarshalQUICClientInitialPacket(buf[:n]) // decodes QUIC Client Initial Packet
     if err != nil {
         panic(err)    
     }
@@ -75,79 +96,42 @@ See [tlsfingerprint.io](https://tlsfingerprint.io) and [quic.tlsfingerprint.io](
     fmt.Println(string(jsonB)) // including fingerprint IDs of: ClientInitialPacket, QUIC Header, QUIC ClientHello, QUIC Transport Parameters' combination
 ```
 
-#### Use with Caddy
+#### Multiple packets
 
-`clienthellod` is also provided as a Caddy plugin, `modcaddy`, which can be used to capture ClientHello messages and QUIC Client Initial Packets. See Section [modcaddy](#modcaddy) for more details.
+Implementations including Chrome/Chromium sends oversized Client Hello which does not fit into one single QUIC packet, in which case multiple QUIC Initial Packets are sent.
 
-## modcaddy
+```go
+    gci := GatherClientInitials() // Each GatherClientInitials reassembles one QUIC Client Initial Packets stream. Use a QUIC Fingerprinter for multiple potential senders, which automatically demultiplexes the packets based on the source address.
+    
+    udpConn, err := net.ListenUDP("udp", ":443")
+    defer udpConn.Close()
 
-`modcaddy` is a Caddy plugin that provides:
-- An caddy `app` that can be used to temporarily store captured ClientHello messages and QUIC Client Initial Packets. 
-- A caddy `handler` that can be used to serve the ClientHello messages and QUIC Client Initial Packets to the client sending the request. 
-- A caddy `listener` that can be used to capture ClientHello messages and QUIC Client Initial Packets.
-
-You will need to use [xcaddy](https://github.com/caddyserver/xcaddy) to rebuild Caddy with `modcaddy` included.
-
-It is worth noting that some web browsers may not choose to switch to QUIC protocol in localhost environment, which may result in the QUIC Client Initial Packet not being sent and therefore not being captured/analyzed.
-
-### Build 
-
-```bash
-xcaddy build --with github.com/gaukas/clienthellod/modcaddy
-```
-
-#### When build locally with changes 
-
-```bash
-xcaddy build --with github.com/gaukas/clienthellod/modcaddy --with github.com/gaukas/clienthellod/=./
-```
-
-### Caddyfile
-
-A sample Caddyfile is provided below.
-
-```Caddyfile
-{      
-    # debug # for debugging purpose
-    # https_port   443 # currently, QUIC listener works only on port 443, otherwise you need to make changes to the code
-    order clienthellod before file_server # make sure it hits handler before file_server
-    clienthellod { # app (reservoir)
-        validfor 120s 30s # params: validFor [cleanEvery] # increased for QUIC
-    }
-    servers {
-        listener_wrappers {
-            clienthellod { # listener
-                tcp # listens for TCP and saves TLS ClientHello 
-                udp # listens for UDP and saves QUIC Client Initial Packet
-            }
-            tls
+    for {
+        buf := make([]byte, 65535)
+        n, addr, err := udpConn.ReadFromUDP(buf)
+        if err != nil {
+            panic(err)
         }
-        # protocols h3
-    }
-}
 
-1.mydomain.com {
-    # tls internal
-    clienthellod { # handler
-        # quic # mutually exclusive with tls
-        tls # listener_wrappers.clienthellod.tcp must be set
-    }
-    file_server {
-        root /var/www/html
-    }
-}
+        if addr != knownSenderAddr {
+            continue
+        }
 
-2.mydomain.com {
-    # tls internal
-    clienthellod { # handler
-        quic # listener_wrappers.clienthellod.udp must be set
-        # tls # mutually exclusive with quic
+        ci, err := clienthellod.UnmarshalQUICClientInitialPacket(buf[:n]) // decodes QUIC Client Initial Packet
+        if err != nil {
+            panic(err)    
+        }
+
+        err = gci.AddPacket(ci)
+        if err != nil {
+            panic(err)
+        }
     }
-    file_server {
-        root /var/www/html
-    }
-}
 ```
+
+### Use with Caddy
+
+We also provide clienthellod as a Caddy Module in `modcaddy`, which you can use with Caddy to capture ClientHello messages and QUIC Client Initial Packets. See [modcaddy](https://github.com/gaukas/clienthellod/tree/master/modcaddy) for more details.
 
 ## License
 

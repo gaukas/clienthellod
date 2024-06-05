@@ -98,6 +98,8 @@ var (
 
 	//go:embed internal/testdata/QUIC_IETF_Firefox_126.bin
 	quicIETFData_Firefox126 []byte
+	//go:embed internal/testdata/QUIC_IETF_Firefox_126_0-RTT.bin
+	quicIETFData_Firefox126_0_RTT []byte
 )
 
 var mapTestDecodeQUICHeaderAndFrames = map[string]struct {
@@ -120,6 +122,11 @@ var mapTestDecodeQUICHeaderAndFrames = map[string]struct {
 		data:        quicIETFData_Firefox126,
 		headerTruth: quicHeaderTruth_Firefox126,
 		framesTruth: quicFramesTruth_Firefox126,
+	},
+	"Firefox126_with_0-RTT": {
+		data:        quicIETFData_Firefox126_0_RTT,
+		headerTruth: quicHeaderTruth_Firefox126_0_RTT,
+		framesTruth: quicFramesTruth_Firefox126_0_RTT,
 	},
 }
 

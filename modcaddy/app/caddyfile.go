@@ -23,16 +23,16 @@ as the first argument (validfor).
 */
 func parseCaddyfile(d *caddyfile.Dispenser, _ interface{}) (interface{}, error) {
 	app := &Reservoir{
-		ValidFor: caddy.Duration(DEFAULT_RESERVOIR_ENTRY_VALID_FOR),
-		// CleanInterval: caddy.Duration(DEFAULT_RESERVOIR_CLEANING_INTERVAL),
+		TlsTTL:  caddy.Duration(DEFAULT_TLS_FP_TTL),
+		QuicTTL: caddy.Duration(DEFAULT_QUIC_FP_TTL),
 	}
 
 	for d.Next() {
 		for d.NextBlock(0) {
 			switch d.Val() { // skipcq: CRT-A0014
-			case "validfor":
-				if app.ValidFor != caddy.Duration(DEFAULT_RESERVOIR_ENTRY_VALID_FOR) {
-					return nil, d.Err("only one valid is allowed")
+			case "tls_ttl": // Time-to-Live for each entry
+				if app.TlsTTL != caddy.Duration(DEFAULT_TLS_FP_TTL) {
+					return nil, d.Err("only one tls_ttl is allowed")
 				}
 				args := d.RemainingArgs()
 				if len(args) == 0 {
@@ -42,18 +42,26 @@ func parseCaddyfile(d *caddyfile.Dispenser, _ interface{}) (interface{}, error) 
 				if err != nil {
 					return nil, d.Errf("invalid duration: %v", err)
 				}
-				app.ValidFor = caddy.Duration(duration)
-				// app.CleanInterval = caddy.Duration(duration)
+				app.TlsTTL = caddy.Duration(duration)
 
-				// second argument is deprecated (clean interval)
-				// if len(args) == 2 {
-				// 	duration, err := caddy.ParseDuration(args[1])
-				// 	if err != nil {
-				// 		return nil, d.Errf("invalid duration: %v", err)
-				// 	}
-				// 	app.CleanInterval = caddy.Duration(duration)
-				// }
-				if len(args) > 2 {
+				if len(args) > 1 {
+					return nil, d.Err("too many arguments")
+				}
+			case "quic_ttl": // Time-to-Live for each entry
+				if app.QuicTTL != caddy.Duration(DEFAULT_QUIC_FP_TTL) {
+					return nil, d.Err("only one quic_ttl is allowed")
+				}
+				args := d.RemainingArgs()
+				if len(args) == 0 {
+					return nil, d.ArgErr()
+				}
+				duration, err := caddy.ParseDuration(args[0])
+				if err != nil {
+					return nil, d.Errf("invalid duration: %v", err)
+				}
+				app.QuicTTL = caddy.Duration(duration)
+
+				if len(args) > 1 {
 					return nil, d.Err("too many arguments")
 				}
 			}
