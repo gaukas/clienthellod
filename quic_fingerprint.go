@@ -14,6 +14,7 @@ import (
 	"github.com/gaukas/clienthellod/internal/utils"
 )
 
+// QUICFingerprint can be used to generate a fingerprint of a QUIC connection.
 type QUICFingerprint struct {
 	ClientInitials *GatheredClientInitials
 
@@ -23,6 +24,7 @@ type QUICFingerprint struct {
 	UserAgent string `json:"user_agent,omitempty"` // User-Agent header, set by the caller
 }
 
+// GenerateQUICFingerprint generates a QUICFingerprint from the gathered ClientInitials.
 func GenerateQUICFingerprint(gci *GatheredClientInitials) (*QUICFingerprint, error) {
 	if err := gci.Wait(); err != nil {
 		return nil, err // GatheringClientInitials failed (expired before complete)
@@ -49,8 +51,9 @@ func GenerateQUICFingerprint(gci *GatheredClientInitials) (*QUICFingerprint, err
 	return qfp, nil
 }
 
-const DEFAULT_QUICFINGERPRINT_EXPIRY = 10 * time.Second
+const DEFAULT_QUICFINGERPRINT_EXPIRY = 60 * time.Second
 
+// QUICFingerprinter can be used to fingerprint QUIC connections.
 type QUICFingerprinter struct {
 	mapGatheringClientInitials *sync.Map
 
@@ -58,6 +61,7 @@ type QUICFingerprinter struct {
 	closed  atomic.Bool
 }
 
+// NewQUICFingerprinter creates a new QUICFingerprinter.
 func NewQUICFingerprinter() *QUICFingerprinter {
 	return &QUICFingerprinter{
 		mapGatheringClientInitials: new(sync.Map),
@@ -65,6 +69,7 @@ func NewQUICFingerprinter() *QUICFingerprinter {
 	}
 }
 
+// NewQUICFingerprinterWithTimeout creates a new QUICFingerprinter with a timeout.
 func NewQUICFingerprinterWithTimeout(timeout time.Duration) *QUICFingerprinter {
 	return &QUICFingerprinter{
 		mapGatheringClientInitials: new(sync.Map),
@@ -73,10 +78,12 @@ func NewQUICFingerprinterWithTimeout(timeout time.Duration) *QUICFingerprinter {
 	}
 }
 
+// SetTimeout sets the timeout for gathering ClientInitials.
 func (qfp *QUICFingerprinter) SetTimeout(timeout time.Duration) {
 	qfp.timeout = timeout
 }
 
+// HandlePacket handles a QUIC packet.
 func (qfp *QUICFingerprinter) HandlePacket(from string, p []byte) error {
 	if qfp.closed.Load() {
 		return errors.New("QUICFingerprinter closed")
@@ -120,6 +127,7 @@ func (qfp *QUICFingerprinter) HandlePacket(from string, p []byte) error {
 	return gci.AddPacket(ci)
 }
 
+// HandleUDPConn handles a QUIC connection over UDP.
 func (qfp *QUICFingerprinter) HandleUDPConn(pc net.PacketConn) error {
 	var buf [2048]byte
 	for {
@@ -139,6 +147,7 @@ func (qfp *QUICFingerprinter) HandleUDPConn(pc net.PacketConn) error {
 	}
 }
 
+// HandleIPConn handles a QUIC connection over IP.
 func (qfp *QUICFingerprinter) HandleIPConn(ipc *net.IPConn) error {
 	var buf [2048]byte
 	for {
@@ -167,8 +176,9 @@ func (qfp *QUICFingerprinter) HandleIPConn(ipc *net.IPConn) error {
 	}
 }
 
-func (qfp *QUICFingerprinter) Lookup(from string) *QUICFingerprint {
-	gci, ok := qfp.mapGatheringClientInitials.Load(from) // when using LoadAndDelete, some implementations "wasting" QUIC connections will fail
+// Peek looks up a QUICFingerprint for a given key.
+func (qfp *QUICFingerprinter) Peek(from string) *QUICFingerprint {
+	gci, ok := qfp.mapGatheringClientInitials.Load(from)
 	if !ok {
 		return nil
 	}
@@ -190,8 +200,12 @@ func (qfp *QUICFingerprinter) Lookup(from string) *QUICFingerprint {
 	return qf
 }
 
-func (qfp *QUICFingerprinter) LookupAwait(from string) (*QUICFingerprint, error) {
-	gci, ok := qfp.mapGatheringClientInitials.Load(from) // when using LoadAndDelete, some implementations "wasting" QUIC connections will fail
+// PeekAwait looks up a QUICFingerprint for a given key.
+// It will wait for the gathering to complete if the key exists but the
+// gathering is not yet complete, e.g., when CRYPTO frames spread across
+// multiple initial packets and some but not all of them are received.
+func (qfp *QUICFingerprinter) PeekAwait(from string) (*QUICFingerprint, error) {
+	gci, ok := qfp.mapGatheringClientInitials.Load(from)
 	if !ok {
 		return nil, errors.New("GatheredClientInitials not found for the given key")
 	}
@@ -209,6 +223,56 @@ func (qfp *QUICFingerprinter) LookupAwait(from string) (*QUICFingerprint, error)
 	return qf, nil
 }
 
+// Pop looks up a QUICFingerprint for a given key and deletes it from
+// the fingerprinter if found.
+func (qfp *QUICFingerprinter) Pop(from string) *QUICFingerprint {
+	gci, ok := qfp.mapGatheringClientInitials.LoadAndDelete(from)
+	if !ok {
+		return nil
+	}
+
+	gatheredCI, ok := gci.(*GatheredClientInitials)
+	if !ok {
+		return nil
+	}
+
+	if !gatheredCI.Completed() {
+		return nil // gathering incomplete
+	}
+
+	qf, err := GenerateQUICFingerprint(gatheredCI)
+	if err != nil {
+		return nil
+	}
+
+	return qf
+}
+
+// PopAwait looks up a QUICFingerprint for a given key and deletes it from
+// the fingerprinter if found.
+// It will wait for the gathering to complete if the key exists but the
+// gathering is not yet complete, e.g., when CRYPTO frames spread across
+// multiple initial packets and some but not all of them are received.
+func (qfp *QUICFingerprinter) PopAwait(from string) (*QUICFingerprint, error) {
+	gci, ok := qfp.mapGatheringClientInitials.LoadAndDelete(from)
+	if !ok {
+		return nil, errors.New("GatheredClientInitials not found for the given key")
+	}
+
+	gatheredCI, ok := gci.(*GatheredClientInitials)
+	if !ok {
+		return nil, errors.New("GatheredClientInitials loaded from sync.Map failed type assertion")
+	}
+
+	qf, err := GenerateQUICFingerprint(gatheredCI)
+	if err != nil {
+		return nil, err
+	}
+
+	return qf, nil
+}
+
+// Close closes the QUICFingerprinter.
 func (qfp *QUICFingerprinter) Close() {
 	qfp.closed.Store(true)
 }

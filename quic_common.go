@@ -56,6 +56,7 @@ func ReadNextVLI(r io.Reader) (val uint64, n int, err error) {
 	return
 }
 
+// DecodeVLI decodes a variable-length integer from the given byte slice.
 func DecodeVLI(vli []byte) (val uint64, err error) {
 	var n int
 	val, n, err = ReadNextVLI(bytes.NewReader(vli))
@@ -74,6 +75,7 @@ func unsetVLIBits(vli []byte) {
 	}
 }
 
+// IsGREASETransportParameter checks if the given transport parameter type is a GREASE value.
 func IsGREASETransportParameter(paramType uint64) bool {
 	return paramType >= 27 && (paramType-27)%31 == 0 // reserved values are 27, 58, 89, ...
 }

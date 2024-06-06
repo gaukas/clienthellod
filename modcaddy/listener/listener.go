@@ -1,7 +1,6 @@
 package listener
 
 import (
-	"errors"
 	"net"
 
 	"github.com/caddyserver/caddy/v2"
@@ -59,8 +58,8 @@ func (lw *ListenerWrapper) Provision(ctx caddy.Context) error { // skipcq: GO-W1
 	lw.logger.Info("clienthellod listener logger loaded.")
 
 	// reservoir
-	if a := ctx.AppIfConfigured(app.CaddyAppID); a == nil {
-		return errors.New("clienthellod listener: global reservoir is not configured")
+	if a, err := ctx.AppIfConfigured(app.CaddyAppID); err != nil {
+		return err
 	} else {
 		lw.reservoir = a.(*app.Reservoir)
 		lw.logger.Info("clienthellod listener reservoir loaded.")
@@ -87,75 +86,6 @@ func (lw *ListenerWrapper) Provision(ctx caddy.Context) error { // skipcq: GO-W1
 	lw.logger.Info("clienthellod listener provisioned.")
 	return nil
 }
-
-// func (lw *ListenerWrapper) udpLoop() { // skipcq: GO-W1029
-// 	for {
-// 		var buf [2048]byte
-// 		n, ipAddr, err := lw.udpListener.ReadFromIP(buf[:])
-// 		if err != nil {
-// 			lw.logger.Error("UDP read error", zap.Error(err))
-// 			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, net.ErrClosed) {
-// 				return // return when listener is closed
-// 			}
-// 			continue
-// 		}
-// 		// lw.logger.Debug("Received UDP packet from " + ipAddr.String())
-
-// 		// Parse UDP Packet
-// 		udpPkt, err := utils.ParseUDPPacket(buf[:n])
-// 		if err != nil {
-// 			lw.logger.Error("Failed to parse UDP packet", zap.Error(err))
-// 			continue
-// 		}
-// 		if udpPkt.DstPort != 443 {
-// 			continue
-// 		}
-// 		udpAddr := &net.UDPAddr{IP: ipAddr.IP, Port: int(udpPkt.SrcPort)}
-// 		// lw.logger.Debug("Parsed UDP packet from " + udpAddr.String())
-
-// 		cip, err := clienthellod.ParseQUICCIP(udpPkt.Payload)
-// 		if err != nil {
-// 			lw.logger.Debug("Failed to parse QUIC CIP: ", zap.Error(err))
-// 			continue
-// 		}
-// 		// lw.logger.Debug("Depositing QClientHello from " + ipAddr.String())
-// 		lw.reservoir.DepositQUICCIP(udpAddr.String(), cip)
-// 	}
-// }
-
-// func (lw *ListenerWrapper) udp6Loop() { // skipcq: GO-W1029
-// 	for {
-// 		var buf [2048]byte
-// 		n, ipAddr, err := lw.udp6Listener.ReadFromIP(buf[:])
-// 		if err != nil {
-// 			lw.logger.Error("UDP read error", zap.Error(err))
-// 			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, net.ErrClosed) {
-// 				return // return when listener is closed
-// 			}
-// 			continue
-// 		}
-// 		// lw.logger.Debug("Received UDP packet from " + ipAddr.String())
-
-// 		// Parse UDP Packet
-// 		udpPkt, err := utils.ParseUDPPacket(buf[:n])
-// 		if err != nil {
-// 			lw.logger.Error("Failed to parse UDP packet", zap.Error(err))
-// 			continue
-// 		}
-// 		if udpPkt.DstPort != 443 {
-// 			continue
-// 		}
-// 		udpAddr := &net.UDPAddr{IP: ipAddr.IP, Port: int(udpPkt.SrcPort)}
-// 		// lw.logger.Debug("Parsed UDP packet from " + udpAddr.String())
-
-// 		cip, err := clienthellod.ParseQUICCIP(udpPkt.Payload)
-// 		if err != nil {
-// 			continue
-// 		}
-// 		// lw.logger.Debug("Depositing QClientHello from " + ipAddr.String())
-// 		lw.reservoir.DepositQUICCIP(udpAddr.String(), cip)
-// 	}
-// }
 
 func (lw *ListenerWrapper) WrapListener(l net.Listener) net.Listener { // skipcq: GO-W1029
 	lw.logger.Info("Wrapping listener " + l.Addr().String() + "on network " + l.Addr().Network() + "...")

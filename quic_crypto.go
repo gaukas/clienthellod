@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
+// ClientInitialKeysCalc calculates the client key, IV and header protection key from the initial random.
 func ClientInitialKeysCalc(initialRandom []byte) (clientKey, clientIV, clientHpKey []byte, err error) {
 	initialSalt := []byte{
 		0x38, 0x76, 0x2c, 0xf7,
@@ -70,6 +71,7 @@ func hkdfExpandLabel(key []byte, label string, context []byte, length uint16) ([
 	return out, nil
 }
 
+// ComputeHeaderProtection computes the header protection for the client.
 func ComputeHeaderProtection(clientHpKey, sample []byte) ([]byte, error) {
 	if len(clientHpKey) != 16 || len(sample) != 16 {
 		panic("invalid input")
@@ -87,6 +89,7 @@ func ComputeHeaderProtection(clientHpKey, sample []byte) ([]byte, error) {
 	return headerProtection[:5], nil
 }
 
+// DecryptAES128GCM decrypts the AES-128-GCM encrypted data.
 func DecryptAES128GCM(iv []byte, recordNum uint64, key, ciphertext, recdata, authtag []byte) (plaintext []byte, err error) {
 	buildIV(iv, recordNum)
 

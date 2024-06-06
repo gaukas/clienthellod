@@ -2,11 +2,12 @@ package utils
 
 import "sort"
 
-type SliceType interface {
+type SliceIntType interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64
 }
 
-func DedupIntArr[T SliceType](arr []T) []T {
+// DedupIntArr eliminates the duplicates in an integer array.
+func DedupIntArr[T SliceIntType](arr []T) []T {
 	// Sort the array
 	sort.Slice(arr, func(i, j int) bool { return arr[i] < arr[j] })
 

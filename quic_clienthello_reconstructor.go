@@ -8,6 +8,7 @@ import (
 	"runtime"
 )
 
+// QUICClientHello can be used to parse fragments of a QUIC ClientHello.
 type QUICClientHelloReconstructor struct {
 	fullLen uint32 // parse from first fragment
 	buf     []byte
@@ -15,6 +16,7 @@ type QUICClientHelloReconstructor struct {
 	frags map[uint64][]byte // offset: fragment, pending to be parsed
 }
 
+// NewQUICClientHelloReconstructor creates a new QUICClientHelloReconstructor.
 func NewQUICClientHelloReconstructor() *QUICClientHelloReconstructor {
 	qchr := &QUICClientHelloReconstructor{
 		frags: make(map[uint64][]byte),
@@ -113,6 +115,7 @@ func (qchr *QUICClientHelloReconstructor) AddCRYPTOFragment(offset uint64, frag 
 	return nil
 }
 
+// ReconstructAsBytes reassembles the ClientHello as bytes.
 func (qchr *QUICClientHelloReconstructor) ReconstructAsBytes() []byte {
 	if qchr.fullLen == 0 {
 		return nil
@@ -123,6 +126,7 @@ func (qchr *QUICClientHelloReconstructor) ReconstructAsBytes() []byte {
 	}
 }
 
+// Reconstruct reassembles the ClientHello as a QUICClientHello struct.
 func (qchr *QUICClientHelloReconstructor) Reconstruct() (*QUICClientHello, error) {
 	if b := qchr.ReconstructAsBytes(); len(b) > 0 {
 		return ParseQUICClientHello(b)

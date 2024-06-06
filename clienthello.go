@@ -15,6 +15,7 @@ import (
 	"golang.org/x/crypto/cryptobyte"
 )
 
+// ClientHello represents a captured ClientHello message with all fingerprintable fields.
 type ClientHello struct {
 	raw []byte
 
@@ -53,7 +54,7 @@ type ClientHello struct {
 	lengthPrefixedCertCompressAlgos []uint8
 	keyshareGroupsWithLengths       []uint16
 
-	// QUIC-only
+	// QUIC-only, nil if not QUIC
 	qtp *QUICTransportParameters
 }
 
