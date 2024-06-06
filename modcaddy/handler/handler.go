@@ -170,12 +170,17 @@ func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next cadd
 
 	// h.logger.Debug(fmt.Sprintf("Fetched QUIC fingerprint for %s", req.RemoteAddr))
 
-	// Get IP part of the RemoteAddr
-	ip, _, err := net.SplitHostPort(req.RemoteAddr)
-	if err == nil {
-		h.reservoir.NewQUICVisitor(ip, req.RemoteAddr)
-	} else {
-		h.logger.Error(fmt.Sprintf("Can't extract IP from %s: %v", req.RemoteAddr, err))
+	// If this is a QUIC request, we record the IP address as a QUIC visitor
+	// so this QUIC fingerprint is associated with the IP address and can be
+	// fetched for even HTTP-over-TLS (TCP-based) requests.
+	if req.ProtoMajor == 3 {
+		// Get IP part of the RemoteAddr
+		ip, _, err := net.SplitHostPort(req.RemoteAddr)
+		if err == nil {
+			h.reservoir.NewQUICVisitor(ip, req.RemoteAddr)
+		} else {
+			h.logger.Error(fmt.Sprintf("Can't extract IP from %s: %v", req.RemoteAddr, err))
+		}
 	}
 
 	qfp.UserAgent = req.UserAgent()
