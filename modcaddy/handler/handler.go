@@ -119,11 +119,17 @@ func (h *Handler) serveTLS(wr http.ResponseWriter, req *http.Request, next caddy
 		return next.ServeHTTP(wr, req)
 	}
 
-	// write JSON to response
+	// Properly set the Content-Type header
 	wr.Header().Set("Content-Type", "application/json")
+
+	// Close the HTTP connection after sending the response
+	//
+	// HTTP/1.X only. Forbidden in HTTP/2 (RFC 9113 Section 8.2.2)
+	// and HTTP/3 (RFC 9114 Section 4.2)
 	if req.ProtoMajor == 1 {
-		wr.Header().Set("Connection", "close") // HTTP/1 only. Forbidden in HTTP/2, HTTP/3
+		wr.Header().Set("Connection", "close")
 	}
+
 	_, err = wr.Write(b)
 	if err != nil {
 		h.logger.Error("failed to write response", zap.Error(err))
@@ -136,7 +142,6 @@ func (h *Handler) serveTLS(wr http.ResponseWriter, req *http.Request, next caddy
 // reservoir and writing it to the response.
 func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
 	var from string
-
 	if req.ProtoMajor == 3 {
 		from = req.RemoteAddr
 	} else {
@@ -159,7 +164,7 @@ func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next cadd
 	// get the client hello from the reservoir
 	qfp, err := h.reservoir.QUICFingerprinter().PeekAwait(from)
 	if err != nil {
-		h.logger.Error(fmt.Sprintf("Unable to fetch QUIC fingerprint sent by %s: %v", req.RemoteAddr, err))
+		h.logger.Debug(fmt.Sprintf("Unable to fetch QUIC fingerprint sent by %s: %v", req.RemoteAddr, err))
 		return next.ServeHTTP(wr, req)
 	}
 
@@ -187,11 +192,17 @@ func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next cadd
 		return next.ServeHTTP(wr, req)
 	}
 
-	// write JSON to response
+	// Properly set the Content-Type header
 	wr.Header().Set("Content-Type", "application/json")
+
+	// Close the HTTP connection after sending the response
+	//
+	// HTTP/1.X only. Forbidden in HTTP/2 (RFC 9113 Section 8.2.2)
+	// and HTTP/3 (RFC 9114 Section 4.2)
 	if req.ProtoMajor == 1 {
-		wr.Header().Set("Connection", "close") // HTTP/1 only. Forbidden in HTTP/2, HTTP/3
+		wr.Header().Set("Connection", "close")
 	}
+
 	_, err = wr.Write(b)
 	if err != nil {
 		h.logger.Error("failed to write response", zap.Error(err))
