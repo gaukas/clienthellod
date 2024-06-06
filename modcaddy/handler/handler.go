@@ -74,7 +74,7 @@ func (h *Handler) Provision(ctx caddy.Context) error { // skipcq: GO-W1029
 
 // ServeHTTP
 func (h *Handler) ServeHTTP(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
-	h.logger.Debug("Sering HTTP to " + req.RemoteAddr + " on Protocol " + req.Proto)
+	h.logger.Debug("Serving HTTP to " + req.RemoteAddr + " on Protocol " + req.Proto)
 
 	if h.TLS && req.ProtoMajor <= 2 { // When TLS is enabled and for HTTP/1.0 or HTTP/1.1 or H2 served over TLS
 		return h.serveTLS(wr, req, next)
@@ -144,6 +144,7 @@ func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next cadd
 	var from string
 	if req.ProtoMajor == 3 {
 		from = req.RemoteAddr
+		h.logger.Debug(fmt.Sprintf("Fetching QUIC Fingerprint directly sent by QUIC client at %s", from))
 	} else {
 		// Get IP part of the RemoteAddr
 		ip, _, err := net.SplitHostPort(req.RemoteAddr)
@@ -159,6 +160,8 @@ func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next cadd
 			h.logger.Debug(fmt.Sprintf("Can't find last QUIC visitor for %s", ip))
 			return next.ServeHTTP(wr, req)
 		}
+
+		h.logger.Debug(fmt.Sprintf("Fetching most recent QUIC Fingerprint sent by %s for TLS client at %s", from, req.RemoteAddr))
 	}
 
 	// get the client hello from the reservoir
