@@ -93,13 +93,16 @@ func (h *Handler) ServeHTTP(wr http.ResponseWriter, req *http.Request, next cadd
 // serveTLS handles HTTP/1.0, HTTP/1.1, H2 requests by looking up the
 // ClientHello from the reservoir and writing it to the response.
 func (h *Handler) serveTLS(wr http.ResponseWriter, req *http.Request, next caddyhttp.Handler) error { // skipcq: GO-W1029
+	// Moved to the top to prevent web broswers caching QUIC after an tls fetching error
+	wr.Header().Set("Alt-Svc", "clear") // to prevent web broswers switching to QUIC
+
 	// get the client hello from the reservoir
 	ch := h.reservoir.TLSFingerprinter().Pop(req.RemoteAddr)
 	if ch == nil {
-		h.logger.Debug(fmt.Sprintf("Can't extract TLS ClientHello sent by %s, maybe not TLS connection?", req.RemoteAddr))
+		h.logger.Debug(fmt.Sprintf("Unable to fetch TLS ClientHello sent by %s, maybe not TLS connection?", req.RemoteAddr))
 		return next.ServeHTTP(wr, req)
 	}
-	// h.logger.Debug(fmt.Sprintf("Extracted TLS ClientHello for %s", req.RemoteAddr))
+	// h.logger.Debug(fmt.Sprintf("Fetched TLS ClientHello for %s", req.RemoteAddr))
 
 	ch.UserAgent = req.UserAgent()
 
@@ -121,7 +124,6 @@ func (h *Handler) serveTLS(wr http.ResponseWriter, req *http.Request, next caddy
 	if req.ProtoMajor == 1 {
 		wr.Header().Set("Connection", "close") // HTTP/1 only. Forbidden in HTTP/2, HTTP/3
 	}
-	wr.Header().Set("Alt-Svc", "clear") // to prevent web broswers switching to QUIC
 	_, err = wr.Write(b)
 	if err != nil {
 		h.logger.Error("failed to write response", zap.Error(err))
@@ -157,11 +159,11 @@ func (h *Handler) serveQUIC(wr http.ResponseWriter, req *http.Request, next cadd
 	// get the client hello from the reservoir
 	qfp, err := h.reservoir.QUICFingerprinter().PeekAwait(from)
 	if err != nil {
-		h.logger.Error(fmt.Sprintf("Can't extract QUIC fingerprint sent by %s: %v", req.RemoteAddr, err))
+		h.logger.Error(fmt.Sprintf("Unable to fetch QUIC fingerprint sent by %s: %v", req.RemoteAddr, err))
 		return next.ServeHTTP(wr, req)
 	}
 
-	// h.logger.Debug(fmt.Sprintf("Extracted QUIC fingerprint for %s", req.RemoteAddr))
+	// h.logger.Debug(fmt.Sprintf("Fetched QUIC fingerprint for %s", req.RemoteAddr))
 
 	// Get IP part of the RemoteAddr
 	ip, _, err := net.SplitHostPort(req.RemoteAddr)
