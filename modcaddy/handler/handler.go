@@ -54,8 +54,8 @@ func (h *Handler) Provision(ctx caddy.Context) error { // skipcq: GO-W1029
 	h.logger = ctx.Logger(h)
 	h.logger.Info("clienthellod handler logger loaded.")
 
-	if a := ctx.AppIfConfigured(app.CaddyAppID); a == nil {
-		return errors.New("clienthellod handler: global reservoir is not configured")
+	if a, err := ctx.AppIfConfigured(app.CaddyAppID); err != nil {
+		return err
 	} else {
 		h.reservoir = a.(*app.Reservoir)
 		h.logger.Info("clienthellod handler reservoir loaded.")
