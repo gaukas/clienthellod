@@ -26,50 +26,7 @@ xcaddy build --with github.com/gaukas/clienthellod/modcaddy --with github.com/ga
 
 ## sample Caddyfile
 
-A sample Caddyfile is provided below.
-
-```Caddyfile
-{      
-    # debug # for debugging purpose
-    # https_port 443 # currently, QUIC listener works only on port 443, otherwise you need to make changes to the code
-    order clienthellod before file_server # make sure it hits handler before file_server
-    clienthellod { # app (reservoir)
-        tls_ttl 10s
-        quic_ttl 60s
-    }
-    servers {
-        listener_wrappers {
-            clienthellod { # listener
-                tcp # listens for TCP and saves TLS ClientHello 
-                udp # listens for UDP and saves QUIC Client Initial Packet
-            }
-            tls
-        }
-    }
-}
-
-1.mydomain.com {
-    # tls internal
-    clienthellod { # handler
-        # quic # mutually exclusive with tls
-        tls # listener_wrappers.clienthellod.tcp must be set
-    }
-    file_server {
-        root /var/www/html
-    }
-}
-
-2.mydomain.com {
-    # tls internal
-    clienthellod { # handler
-        quic # listener_wrappers.clienthellod.udp must be set
-        # tls # mutually exclusive with quic
-    }
-    file_server {
-        root /var/www/html
-    }
-}
-```
+A sample Caddyfile is provided in this directory. 
 
 ## Known issues
 

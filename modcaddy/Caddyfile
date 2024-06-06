@@ -1,39 +1,45 @@
 {      
-    debug
-    # http_port    7080
-	# https_port   7443
-    order clienthellod before file_server # make sure handler before file_server
-    clienthellod { # app (reservoir)
-        validfor 120s 30s # params: validFor [cleanEvery] # increased for QUIC
+    debug # for debugging purpose
+    # https_port   443 # currently, QUIC listener works only on port 443, otherwise you need to make changes to the code
+    order clienthellod before file_server # make sure it hits handler before file_server
+    clienthellod { # app
+        tls_ttl 5s # ttl can be shorter to reduce memory consumption
+        quic_ttl 30s # slightly longer than tls_ttl to display QUIC fingerprints for H3 requests reusing QUIC connection
     }
     servers {
-        listener_wrappers {
-            clienthellod { # listener
-                tcp # listens for TCP and saves TLS ClientHello 
-                udp # listens for UDP and saves QUIC ClientHello
+        listener_wrappers { # listener
+            clienthellod { # make sure packets hit clienthellod before caddy's TLS server
+                tcp # listens for TCP and fingerprints TLS Client Hello messages
+                udp # listens for UDP and fingerprints QUIC Initial packets
             }
             tls
         }
-        # protocols h3
-    }
+    } 
 }
 
-1.mydomain.com {
-    # tls internal
+tls.gauk.as, *.tls.gauk.as {
+    tls {
+        dns cloudflare YOUR_API_TOKEN # for wildcard cert, see https://github.com/libdns/cloudflare
+        resolvers 1.1.1.1
+        alpn http/1.1 # to use Connection: close header and close the connection immediately
+    }
     clienthellod { # handler
-        # quic # mutually exclusive with tls
-        tls # listener_wrappers.clienthellod.tcp must be set
+        # global.servers.listener_wrappers.clienthellod.tcp must present
+        tls # mutually exclusive with quic
     }
     file_server {
         root /var/www/html
     }
 }
 
-2.mydomain.com {
-    # tls internal
+quic.gauk.as, *.quic.gauk.as {
+    tls {
+        dns cloudflare YOUR_API_TOKEN # for wildcard cert, see https://github.com/libdns/cloudflare
+        resolvers 1.1.1.1
+    }
     clienthellod { # handler
-        quic # listener_wrappers.clienthellod.udp must be set
-        # tls # mutually exclusive with quic
+        # global.servers.listener_wrappers.clienthellod.udp must present
+        quic # mutually exclusive with tls
     }
     file_server {
         root /var/www/html
